@@ -1,0 +1,115 @@
+{
+  "company_profile": {
+    "company_name": "ABC Technologies Inc.",
+    "industry": "B2B SaaS / Enterprise Cloud Analytics",
+    "annual_revenue": 85000000.0,
+    "headcount": 420,
+    "policy_number": "POL-001",
+    "product_name": "Commercial Cyber Liability & Technology E&O",
+    "guidewire_account_number": "ACC-90214",
+    "current_terms": {
+      "aggregate_limit": 5000000.0,
+      "ransomware_sublimit": 2500000.0,
+      "retention": 50000.0,
+      "coinsurance_pct": 0.0,
+      "annual_premium": 78000.0
+    }
+  },
+  "scenarios": {
+    "scenario_a_healthy_baseline": {
+      "id": "scenario_a_healthy_baseline",
+      "name": "Scenario A (Healthy Baseline)",
+      "description": "Initial policy inception / healthy posture: 98% MFA enforcement, no critical CVEs, no exposed RDP, 95% EDR agent coverage. Risk score is well below 40, resulting in NOMINAL action with standard policy terms.",
+      "expected_outcome": {
+        "expected_score_range": [0.0, 39.9],
+        "expected_risk_tier": "LOW",
+        "expected_action": "NOMINAL",
+        "guidewire_activity_expected": false
+      },
+      "telemetry": {
+        "tenant_id": "TENANT-ABC-TECH",
+        "company_name": "ABC Technologies Inc.",
+        "policy_number": "POL-001",
+        "timestamp": "2026-09-24T08:00:00Z",
+        "mfa_enforcement_rate": 0.98,
+        "exposed_rdp_port": false,
+        "open_ports": [80, 443],
+        "critical_cves": [],
+        "edr_agent_coverage": 0.95,
+        "immutable_backups_verified": true,
+        "security_awareness_training_rate": 0.94
+      }
+    },
+    "scenario_b_deteriorating_risk": {
+      "id": "scenario_b_deteriorating_risk",
+      "name": "Scenario B (Deteriorating Risk)",
+      "description": "Continuous telemetry detects significant control decay: MFA enforcement drops to 65% due to onboarding backlog, port 3389 exposed on a legacy jumpbox, 2 critical RCE CVEs unpatched past 14 days, EDR coverage drops to 76%. Aggregate score escalates to 80.0, triggering mandatory Underwriter Review in Guidewire PolicyCenter.",
+      "expected_outcome": {
+        "expected_score_range": [60.1, 100.0],
+        "expected_risk_tier": "CRITICAL",
+        "expected_action": "REVIEW_REQUIRED",
+        "guidewire_activity_expected": true,
+        "recommended_endorsements": [
+          "CYBER-CRITICAL-SURCHARGE-RESTRICT-2026",
+          "-50% Ransomware Sublimit Cut ($1,250,000)",
+          "3.0x Retention Surcharge ($150,000)",
+          "25% Co-insurance Requirement"
+        ]
+      },
+      "telemetry": {
+        "tenant_id": "TENANT-ABC-TECH",
+        "company_name": "ABC Technologies Inc.",
+        "policy_number": "POL-001",
+        "timestamp": "2026-09-24T12:30:00Z",
+        "mfa_enforcement_rate": 0.65,
+        "exposed_rdp_port": true,
+        "open_ports": [80, 443, 3389],
+        "critical_cves": [
+          {
+            "cve_id": "CVE-2024-38077",
+            "severity": "CRITICAL",
+            "cvss_score": 9.8,
+            "aging_days": 21,
+            "is_rce": true,
+            "description": "Windows Remote Desktop Licensing Service Remote Code Execution vulnerability"
+          },
+          {
+            "cve_id": "CVE-2024-21413",
+            "severity": "CRITICAL",
+            "cvss_score": 9.8,
+            "aging_days": 18,
+            "is_rce": true,
+            "description": "Microsoft Outlook Moniker Remote Code Execution (CVE aging > 14 days without patch)"
+          }
+        ],
+        "edr_agent_coverage": 0.76,
+        "immutable_backups_verified": false,
+        "security_awareness_training_rate": 0.71
+      }
+    },
+    "scenario_c_remediated_posture": {
+      "id": "scenario_c_remediated_posture",
+      "name": "Scenario C (Remediated Posture)",
+      "description": "Following underwriter advisory and broker intervention, ABC Technologies remediates all deficiencies: closes port 3389, deploys patches for the 2 critical CVEs, mandates MFA across 98% of users, and re-deploys EDR to 95%. Risk score returns to 5.0 (NOMINAL), allowing reinstatement of standard policy terms.",
+      "expected_outcome": {
+        "expected_score_range": [0.0, 39.9],
+        "expected_risk_tier": "LOW",
+        "expected_action": "NOMINAL",
+        "guidewire_activity_expected": false
+      },
+      "telemetry": {
+        "tenant_id": "TENANT-ABC-TECH",
+        "company_name": "ABC Technologies Inc.",
+        "policy_number": "POL-001",
+        "timestamp": "2026-09-24T16:00:00Z",
+        "mfa_enforcement_rate": 0.98,
+        "exposed_rdp_port": false,
+        "open_ports": [80, 443],
+        "critical_cves": [],
+        "edr_agent_coverage": 0.95,
+        "immutable_backups_verified": true,
+        "security_awareness_training_rate": 0.95
+      }
+    }
+  }
+}
