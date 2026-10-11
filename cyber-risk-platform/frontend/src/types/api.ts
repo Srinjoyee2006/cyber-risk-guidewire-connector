@@ -143,3 +143,120 @@ export interface NvdIngestionRequest {
   has_kev?: boolean
   max_records?: number
 }
+
+// ----------------------------------------------------
+// Authorized Organization, Assets, and Observations Types
+// ----------------------------------------------------
+
+export type DataAuthorizationStatus = 'GRANTED' | 'REVOKED' | 'PENDING'
+export type AssetCriticality = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+export type ObservationStatus = 'OBSERVED' | 'CONFIRMED' | 'FIXED' | 'FALSE_POSITIVE' | 'UNKNOWN'
+export type MatchType = 'SCANNER_REPORTED' | 'CPE_CANDIDATE'
+
+export interface OrganizationResponse {
+  organization_id: string
+  organization_ref: string
+  display_name: string
+  data_authorization_status: DataAuthorizationStatus
+  authorization_scope: Record<string, any>
+  created_at: string
+  updated_at: string
+}
+
+export interface OrganizationCreateRequest {
+  organization_ref: string
+  display_name: string
+  data_authorization_status?: DataAuthorizationStatus
+  authorization_scope?: Record<string, any>
+}
+
+export interface AssetResponse {
+  asset_id: string
+  organization_id: string
+  external_asset_ref: string
+  asset_type: string
+  hostname: string | null
+  vendor: string | null
+  product: string | null
+  version: string | null
+  cpe_name: string | null
+  criticality: AssetCriticality
+  source: string
+  observed_at: string
+  raw_payload: Record<string, any>
+  created_at: string
+  updated_at: string
+}
+
+export interface ImportItemResult {
+  row_number: number
+  external_asset_ref?: string
+  cve_id?: string
+  status: 'ACCEPTED' | 'REJECTED'
+  reason?: string
+  asset_id?: string
+  observation_id?: string
+}
+
+export interface AssetImportResponse {
+  organization_ref: string
+  total_rows: number
+  accepted_count: number
+  rejected_count: number
+  errors: ImportItemResult[]
+}
+
+export interface VulnerabilityObservationResponse {
+  observation_id: string
+  organization_id: string
+  asset_id: string
+  cve_id: string
+  scanner_source: string
+  status: ObservationStatus
+  observed_at: string
+  scanner_severity: string | null
+  evidence: Record<string, any>
+  source_record_id: string | null
+  dedup_hash: string
+  created_at: string
+  external_asset_ref?: string
+  asset_hostname?: string
+  is_known_vulnerability: boolean
+  kev_flag?: boolean
+  public_priority?: PriorityBand
+}
+
+export interface ObservationImportResponse {
+  organization_ref: string
+  total_rows: number
+  accepted_count: number
+  rejected_count: number
+  errors: ImportItemResult[]
+}
+
+export interface AssetVulnerabilityMatch {
+  cve_id: string
+  match_type: MatchType
+  observation_status?: string | null
+  scanner_source?: string | null
+  scanner_severity?: string | null
+  observed_at?: string | null
+  evidence: Record<string, any>
+  confidence: string
+  limitations: string
+  description?: string | null
+  cvss_score?: number | null
+  kev_flag?: boolean
+  priority?: PriorityBand | null
+}
+
+export interface AssetVulnerabilitiesResponse {
+  asset_id: string
+  organization_ref: string
+  external_asset_ref: string
+  hostname?: string | null
+  scanner_reported_matches: AssetVulnerabilityMatch[]
+  cpe_candidate_matches: AssetVulnerabilityMatch[]
+  notice: string
+}
+

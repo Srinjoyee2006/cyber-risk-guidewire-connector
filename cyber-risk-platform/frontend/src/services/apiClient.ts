@@ -116,4 +116,80 @@ export const apiClient = {
       body: JSON.stringify(body),
     })
   },
+
+  // Authorized Organizations & Asset Inventory
+  getOrganizations: (limit = 100, offset = 0): Promise<import('../types/api').OrganizationResponse[]> => {
+    return fetchJson<import('../types/api').OrganizationResponse[]>(`/api/v1/organizations${buildQueryString({ limit, offset })}`)
+  },
+
+  createOrganization: (data: import('../types/api').OrganizationCreateRequest): Promise<import('../types/api').OrganizationResponse> => {
+    return fetchJson<import('../types/api').OrganizationResponse>('/api/v1/organizations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  updateOrganization: (orgRef: string, data: Partial<import('../types/api').OrganizationCreateRequest>): Promise<import('../types/api').OrganizationResponse> => {
+    return fetchJson<import('../types/api').OrganizationResponse>(`/api/v1/organizations/${encodeURIComponent(orgRef)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    })
+  },
+
+  importAssets: (orgRef: string, file: File): Promise<import('../types/api').AssetImportResponse> => {
+    const formData = new FormData()
+    formData.append('organization_ref', orgRef)
+    formData.append('file', file)
+
+    const url = `${API_BASE}/api/v1/assets/import`
+    return fetch(url, {
+      method: 'POST',
+      body: formData,
+    }).then(async (res) => {
+      if (!res.ok) {
+        let msg = res.statusText
+        try {
+          const err = await res.json()
+          msg = err.detail || msg
+        } catch {}
+        throw new ApiError(res.status, msg)
+      }
+      return res.json()
+    })
+  },
+
+  getOrganizationAssets: (orgRef: string, limit = 100, offset = 0): Promise<import('../types/api').AssetResponse[]> => {
+    return fetchJson<import('../types/api').AssetResponse[]>(`/api/v1/organizations/${encodeURIComponent(orgRef)}/assets${buildQueryString({ limit, offset })}`)
+  },
+
+  importObservations: (orgRef: string, file: File): Promise<import('../types/api').ObservationImportResponse> => {
+    const formData = new FormData()
+    formData.append('organization_ref', orgRef)
+    formData.append('file', file)
+
+    const url = `${API_BASE}/api/v1/vulnerability-observations/import`
+    return fetch(url, {
+      method: 'POST',
+      body: formData,
+    }).then(async (res) => {
+      if (!res.ok) {
+        let msg = res.statusText
+        try {
+          const err = await res.json()
+          msg = err.detail || msg
+        } catch {}
+        throw new ApiError(res.status, msg)
+      }
+      return res.json()
+    })
+  },
+
+  getOrganizationObservations: (orgRef: string, limit = 100, offset = 0): Promise<import('../types/api').VulnerabilityObservationResponse[]> => {
+    return fetchJson<import('../types/api').VulnerabilityObservationResponse[]>(`/api/v1/organizations/${encodeURIComponent(orgRef)}/observations${buildQueryString({ limit, offset })}`)
+  },
+
+  getAssetVulnerabilities: (assetId: string): Promise<import('../types/api').AssetVulnerabilitiesResponse> => {
+    return fetchJson<import('../types/api').AssetVulnerabilitiesResponse>(`/api/v1/assets/${encodeURIComponent(assetId)}/vulnerabilities`)
+  },
 }
+

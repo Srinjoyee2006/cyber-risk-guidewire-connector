@@ -68,6 +68,34 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               <Database className="w-4 h-4" />
               Ingestion Runs
             </NavLink>
+
+            <NavLink
+              to="/organizations"
+              className={({ isActive }) =>
+                `flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  isActive
+                    ? 'bg-slate-800 text-purple-300 border border-slate-700 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`
+              }
+            >
+              <ShieldCheck className="w-4 h-4" />
+              Organizations & Assets
+            </NavLink>
+
+            <NavLink
+              to="/observations"
+              className={({ isActive }) =>
+                `flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  isActive
+                    ? 'bg-slate-800 text-purple-300 border border-slate-700 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`
+              }
+            >
+              <Search className="w-4 h-4 text-purple-400" />
+              Observed Vulns
+            </NavLink>
           </nav>
         </div>
       </header>

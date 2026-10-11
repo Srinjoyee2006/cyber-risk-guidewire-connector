@@ -1,0 +1,5 @@
+external_asset_ref,cve_id,scanner_source,status,scanner_severity,observed_at,source_record_id,evidence
+srv-linux-01,CVE-2021-44228,Tenable Nessus,CONFIRMED,Critical,2026-10-11T12:00:00Z,plugin-156014,"{""plugin_id"": 156014, ""port"": 8080, ""output"": ""Log4j JNDI lookup vulnerability detected in classpath log4j-core-2.14.1.jar""}"
+srv-app-02,CVE-2022-0778,Qualys VMDR,OBSERVED,High,2026-10-11T12:30:00Z,qid-38863,"{""qid"": 38863, ""banner"": ""OpenSSL 1.1.1k"", ""proof"": ""BN_mod_sqrt() infinite loop flaw present""}"
+ws-eng-104,CVE-2023-3079,CrowdStrike Falcon,OBSERVED,High,2026-10-11T13:00:00Z,cs-fnd-9912,"{""sensor"": ""Falcon-v7.1"", ""detail"": ""V8 type confusion vulnerability reported in Chrome browser executable""}"
+ws-eng-104,CVE-2099-99999,Internal Audit Tool,OBSERVED,Low,2026-10-11T14:00:00Z,audit-001,"{""note"": ""Unmatched public intelligence vulnerability observation for private advisory testing""}"

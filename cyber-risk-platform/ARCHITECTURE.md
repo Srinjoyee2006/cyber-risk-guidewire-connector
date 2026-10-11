@@ -273,10 +273,39 @@ While vulnerability intelligence and ingestion executions are persisted in SQLit
 
 ---
 
-## 9. Known Limitations
+---
 
-1. **Vulnerability Feed vs Internal Asset Mapping**: NVD records describe general software flaws; they do not indicate whether an insured organization has that specific software or version running.
-2. **No Policy/Organization DB Tables Yet**: Policy and insured company entities are not yet modeled in relational tables (planned for subsequent phases).
-3. **Local SQLite Primary**: SQLite is used for local development and testing (`crgc.db`). Models are engineered for direct PostgreSQL compatibility (`UUID`, `JSON`, `DateTime(timezone=True)`).
+## 9. Authorized Asset Inventory & Vulnerability Observations
+
+### Underwriting & Intelligence Boundary
+* Public CVE and CISA KEV intelligence alone **does NOT prove** that an insured organization has a vulnerability installed or is exposed.
+* Observations are created **only** from authorized asset inventories and authenticated vulnerability-scanner outputs.
+* No network port scanning is performed.
+* No automatic PolicyCenter activities, notes, or premium changes are triggered in this stage.
+* Observations are **never** classified as `CONFIRMED` unless a scanner explicitly reports that status.
+
+### Data Model & Deduplication
+1. **Organizations (`organizations`)**:
+   - Stores `organization_id` (UUID PK), `organization_ref` (unique text), `display_name`, `data_authorization_status` (`GRANTED`, `REVOKED`, `PENDING`), and `authorization_scope` (JSON).
+   - Ingestion is rejected with HTTP 403 unless status is explicitly `GRANTED`.
+2. **Assets (`assets`)**:
+   - Stores `asset_id` (UUID PK), `organization_id` (FK), `external_asset_ref`, `asset_type`, `hostname`, `vendor`, `product`, `version`, `cpe_name`, `criticality`, and `raw_payload`.
+   - Unique constraint: `(organization_id, external_asset_ref)`.
+3. **Vulnerability Observations (`vulnerability_observations`)**:
+   - Stores `observation_id` (UUID PK), `organization_id` (FK), `asset_id` (FK), `cve_id`, `scanner_source`, `status` (`OBSERVED`, `CONFIRMED`, `FIXED`, `FALSE_POSITIVE`, `UNKNOWN`), `scanner_severity`, `evidence`, `source_record_id`, and `dedup_hash`.
+   - **Deduplication Key**: SHA-256 hash of `f"{organization_id}:{asset_id}:{normalized_cve}:{normalized_scanner}:{source_record_id or ''}"`. Enforced via unique constraint `(organization_id, dedup_hash)`.
+
+### Matching Semantics
+* **`SCANNER_REPORTED`**: Exact scanner-detected CVE linked to asset. Status is preserved as reported by the scanner tool. Unknown CVEs in public NVD feeds are stored as unmatched observations, not discarded.
+* **`CPE_CANDIDATE`**: Prospective applicability candidate based on product/CPE string match against public CVE records. Never converted into a confirmed scanner finding. Labeled with `confidence: "LOW_TO_MEDIUM"` and explicit limitation notices.
+
+---
+
+## 10. Known Limitations
+
+1. **Public Feed vs Asset Evidence**: Public CVE/KEV intelligence does not establish organizational impact without authorized scanner telemetry.
+2. **Underwriting Boundary**: Asset observations do not alter policy terms or trigger automated Guidewire PolicyCenter activities in this release.
+3. **Local SQLite Primary**: SQLite is used for local development and testing (`crgc.db`). Models are engineered for PostgreSQL compatibility (`UUID`, `JSON`, `DateTime(timezone=True)`).
 4. **Guidewire Live Integration**: Default execution runs in mock simulation mode (`GW_MOCK_MODE=true`).
 5. **Predefined Scenarios**: Underwriting scenarios remain loaded from [data/scenarios.json](file:///d:/New%20folder/cyber-risk-platform/data/scenarios.json).
+
