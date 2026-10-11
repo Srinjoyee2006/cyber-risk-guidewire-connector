@@ -45,14 +45,26 @@ class GuidewireClient:
     """
 
     def __init__(self, settings: Optional[Settings] = None, client: Optional[httpx.AsyncClient] = None) -> None:
-        self.settings = settings or get_settings()
-        self._external_client = client
+        """
+        Initialize the Guidewire PolicyCenter 10.2.1 API client.
+
+        Args:
+            settings: Optional Settings instance. If omitted, uses default settings from get_settings().
+            client: Optional pre-configured httpx.AsyncClient instance for testing or connection pooling.
+        """
+        self.settings: Settings = settings or get_settings()
+        self._external_client: Optional[httpx.AsyncClient] = client
         self._internal_client: Optional[httpx.AsyncClient] = None
         self._auth_token: Optional[str] = None
         self._token_expiry: Optional[datetime] = None
 
     async def _get_client(self) -> httpx.AsyncClient:
-        """Retrieve or initialize the active httpx.AsyncClient."""
+        """
+        Retrieve or initialize the active asynchronous HTTP client.
+
+        Returns:
+            httpx.AsyncClient: Configured active HTTP client instance.
+        """
         if self._external_client:
             return self._external_client
         if self._internal_client is None or self._internal_client.is_closed:
@@ -63,21 +75,36 @@ class GuidewireClient:
         return self._internal_client
 
     async def close(self) -> None:
-        """Close underlying HTTP client connections."""
+        """
+        Gracefully close underlying HTTP client connections.
+        """
         if self._internal_client and not self._internal_client.is_closed:
             await self._internal_client.aclose()
             self._internal_client = None
 
     async def __aenter__(self) -> "GuidewireClient":
+        """Async context manager entry."""
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[Any],
+    ) -> None:
+        """Async context manager exit with client cleanup."""
         await self.close()
 
     async def _get_auth_headers(self) -> dict[str, str]:
         """
         Acquire OAuth2 Bearer token or generate Basic Authorization headers
         based on GWCP PolicyCenter 10.2.1 security configuration.
+
+        Returns:
+            dict[str, str]: HTTP request headers including Authorization and correlation identifiers.
+
+        Raises:
+            GuidewireClientError: If OAuth2 token negotiation fails.
         """
         headers = {
             "Content-Type": "application/json",
@@ -131,7 +158,23 @@ class GuidewireClient:
     ) -> GuidewireActivityResponse:
         """
         Create an Underwriter Review Activity task targeting Guidewire PolicyCenter 10.2.1.
-        Endpoint: POST /rest/common/v1/activities
+
+        Dispatches an underwriting review activity when continuous telemetry evaluation
+        breaches the review threshold (Score > 60.0). In mock mode, generates a synthetic
+        JSON:API response with an urgent/high priority activity.
+
+        Endpoint:
+            POST /rest/common/v1/activities
+
+        Args:
+            policy_number: Unique policy identifier string (e.g., 'POL-001').
+            assessment: Evaluated RiskAssessmentResult containing scores, penalties, and recommendations.
+
+        Returns:
+            GuidewireActivityResponse: Parsed PolicyCenter JSON:API activity response model.
+
+        Raises:
+            GuidewireClientError: If Guidewire REST API call fails or encounters network errors.
         """
         priority_code = "urgent" if assessment.aggregate_risk_score >= 75.0 else "high"
         target_due_date = datetime.now(timezone.utc) + timedelta(days=2)
@@ -230,7 +273,22 @@ class GuidewireClient:
     ) -> GuidewireNoteResponse:
         """
         Persist an audit trail note on the policy in Guidewire PolicyCenter 10.2.1.
-        Endpoint: POST /rest/policy/v1/policies/{policyNumber}/notes
+
+        Appends a detailed markdown audit record summarizing scoring evaluation,
+        individual actuarial factor penalties, and recommended coverage endorsements.
+
+        Endpoint:
+            POST /rest/policy/v1/policies/{policyNumber}/notes
+
+        Args:
+            policy_number: Unique policy identifier string (e.g., 'POL-001').
+            assessment: Evaluated RiskAssessmentResult containing scores, penalties, and recommendations.
+
+        Returns:
+            GuidewireNoteResponse: Parsed PolicyCenter JSON:API note response model.
+
+        Raises:
+            GuidewireClientError: If Guidewire REST API call fails or encounters network errors.
         """
         subject = f"Continuous Cyber Risk Assessment Audit - {assessment.policy_action.value} ({assessment.assessment_id})"
         
@@ -315,7 +373,18 @@ class GuidewireClient:
     async def get_policy_details(self, policy_number: str) -> dict[str, Any]:
         """
         Fetch current in-force policy metadata from Guidewire PolicyCenter.
-        Endpoint: GET /rest/policy/v1/policies/{policyNumber}
+
+        Endpoint:
+            GET /rest/policy/v1/policies/{policyNumber}
+
+        Args:
+            policy_number: Unique policy identifier string (e.g., 'POL-001').
+
+        Returns:
+            dict[str, Any]: PolicyCenter policy attributes, status, and active coverages.
+
+        Raises:
+            GuidewireClientError: If Guidewire REST API call fails or encounters network errors.
         """
         if self.settings.gw_mock_mode:
             return {

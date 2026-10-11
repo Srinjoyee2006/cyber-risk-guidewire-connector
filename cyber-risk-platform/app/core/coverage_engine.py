@@ -16,13 +16,15 @@ from app.schemas.risk import (
 class CoverageEngine:
     """
     Evaluates in-force policy terms against cybersecurity risk scores.
+
     Determines whether in-force terms are sustainable or if risk-mitigating
     endorsements (sublimit reductions, deductible surcharges, co-insurance) are required.
+    Operates strictly in an advisory capacity without directly mutating PolicyCenter records.
     """
 
-    DEFAULT_AGGREGATE_LIMIT = 5_000_000.00
-    DEFAULT_RANSOMWARE_SUBLIMIT = 2_500_000.00
-    DEFAULT_RETENTION = 50_000.00
+    DEFAULT_AGGREGATE_LIMIT: float = 5_000_000.00
+    DEFAULT_RANSOMWARE_SUBLIMIT: float = 2_500_000.00
+    DEFAULT_RETENTION: float = 50_000.00
 
     def evaluate_coverage(
         self,
@@ -37,6 +39,21 @@ class CoverageEngine:
     ) -> CoverageRecommendation:
         """
         Formulate concrete coverage adjustments based on the aggregate risk score and policy action.
+
+        Args:
+            policy_number: Unique Guidewire PolicyCenter policy identifier (e.g., 'POL-001').
+            risk_score: Computed aggregate risk score from the RiskEngine (0.0 - 100.0).
+            risk_tier: Actuarial tier assigned to the policy (LOW, MEDIUM, HIGH, CRITICAL).
+            policy_action: Prescribed underwriting action (NOMINAL, MONITOR, REVIEW_REQUIRED).
+            factor_penalties: Detailed factor breakdown explaining individual penalty drivers.
+            current_aggregate_limit: In-force aggregate policy limit in USD (default: $5,000,000.00).
+            current_ransomware_sublimit: In-force ransomware sublimit in USD (default: $2,500,000.00).
+            current_retention: In-force retention deductible in USD (default: $50,000.00).
+
+        Returns:
+            CoverageRecommendation: Structured actuarial recommendation detailing sublimit
+                adjustment percentages, retention deductible multipliers, co-insurance requirements,
+                recommended endorsement form codes, financial loss gap analysis, and underwriter notes.
         """
         if policy_action == PolicyAction.NOMINAL:
             # Clean risk profile: Projected event loss is modest and well within limits

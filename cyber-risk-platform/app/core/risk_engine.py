@@ -16,6 +16,7 @@ from app.schemas.risk import (
 class RiskEngine:
     """
     Transparent, explainable actuarial risk scoring engine for cyber insurance underwriting.
+
     Operates without opaque black-box machine learning models to ensure:
     1. Direct regulatory compliance and auditability (NAIC/State DOI underwriting rules).
     2. Explicit cause-and-effect correlation between security telemetry and policy terms.
@@ -23,15 +24,29 @@ class RiskEngine:
     """
 
     def __init__(self, settings: Settings | None = None) -> None:
-        self.settings = settings or get_settings()
+        """
+        Initialize the Actuarial Risk Engine with application settings.
+
+        Args:
+            settings: Optional custom Settings instance. If None, loaded from environment.
+        """
+        self.settings: Settings = settings or get_settings()
 
     def evaluate_mfa(self, mfa_rate: float) -> FactorPenalty:
         """
         Evaluate Multi-Factor Authentication (MFA) enforcement rate against actuarial benchmark.
-        Benchmark: >= 80% enterprise enforcement.
-        Deficit calculation: 1.0 penalty point per 1% deficit below 80%, capped at PENALTY_MFA_MAX (30.0 pts).
+
+        Benchmark:
+            Enforcement >= 80% (0.80) across all active corporate identities.
+            Deficit calculation: 1.0 penalty point per 1% deficit below 80%, capped at PENALTY_MFA_MAX (30.0 pts).
+
+        Args:
+            mfa_rate: Active MFA enforcement ratio (0.0 to 1.0).
+
+        Returns:
+            FactorPenalty: Actuarial factor penalty breakdown detailing points, observed percentage, and rationale.
         """
-        benchmark = self.settings.mfa_enforcement_threshold
+        benchmark: float = self.settings.mfa_enforcement_threshold
         if mfa_rate >= benchmark:
             return FactorPenalty(
                 factor_name="MFA_ENFORCEMENT",
@@ -42,9 +57,9 @@ class RiskEngine:
                 actuarial_rationale="Robust MFA eliminates over 90% of automated credential stuffing and identity takeover attacks.",
             )
 
-        deficit = benchmark - mfa_rate
+        deficit: float = benchmark - mfa_rate
         # 1.0 point per percentage point deficit (e.g., 80% - 65% = 15% -> 15.0 points)
-        penalty = min(self.settings.penalty_mfa_max, round(deficit * 100.0, 2))
+        penalty: float = min(self.settings.penalty_mfa_max, round(deficit * 100.0, 2))
         return FactorPenalty(
             factor_name="MFA_ENFORCEMENT",
             penalty_points=penalty,
@@ -57,9 +72,17 @@ class RiskEngine:
     def evaluate_rdp(self, exposed_rdp: bool, open_ports: list[int]) -> FactorPenalty:
         """
         Evaluate exposed public Remote Access protocols, specifically RDP (Port 3389).
+
         Penalizes direct exposure with PENALTY_EXPOSED_RDP (25.0 pts).
+
+        Args:
+            exposed_rdp: Boolean flag indicating if external scanner flagged exposed RDP.
+            open_ports: List of open TCP port integers detected on the external attack surface.
+
+        Returns:
+            FactorPenalty: Actuarial factor penalty breakdown for public RDP exposure.
         """
-        is_rdp_open = exposed_rdp or (3389 in open_ports)
+        is_rdp_open: bool = exposed_rdp or (3389 in open_ports)
         if not is_rdp_open:
             return FactorPenalty(
                 factor_name="PUBLIC_RDP_EXPOSURE",
@@ -70,7 +93,7 @@ class RiskEngine:
                 actuarial_rationale="Closed remote access perimeter prevents opportunistic brute-force and direct ransomware ingress.",
             )
 
-        penalty = self.settings.penalty_exposed_rdp
+        penalty: float = self.settings.penalty_exposed_rdp
         return FactorPenalty(
             factor_name="PUBLIC_RDP_EXPOSURE",
             penalty_points=penalty,
@@ -83,16 +106,23 @@ class RiskEngine:
     def evaluate_critical_cves(self, cves: list[CVEItem]) -> FactorPenalty:
         """
         Evaluate unpatched Critical vulnerabilities (CVSS >= 9.0 or RCE) aging > 14 days.
+
         Applies PENALTY_CRITICAL_CVE_PER_ITEM (12.5 pts per aging item), capped at PENALTY_CRITICAL_CVE_MAX (35.0 pts).
+
+        Args:
+            cves: List of CVEItem records associated with the insured's exposed assets.
+
+        Returns:
+            FactorPenalty: Actuarial factor penalty breakdown for aging critical CVEs.
         """
-        aging_threshold = self.settings.critical_cve_aging_days_threshold
-        aging_critical = [
+        aging_threshold: int = self.settings.critical_cve_aging_days_threshold
+        aging_critical: list[CVEItem] = [
             cve for cve in cves
             if (cve.severity == CVESeverity.CRITICAL or cve.cvss_score >= 9.0)
             and cve.aging_days > aging_threshold
         ]
 
-        count = len(aging_critical)
+        count: int = len(aging_critical)
         if count == 0:
             return FactorPenalty(
                 factor_name="CRITICAL_CVE_AGING",
@@ -103,9 +133,9 @@ class RiskEngine:
                 actuarial_rationale="Rapid vulnerability remediation suppresses exposure window before exploit weaponization.",
             )
 
-        raw_penalty = count * self.settings.penalty_critical_cve_per_item
-        penalty = min(self.settings.penalty_critical_cve_max, round(raw_penalty, 2))
-        cve_list = ", ".join([f"{c.cve_id} ({c.aging_days}d)" for c in aging_critical])
+        raw_penalty: float = count * self.settings.penalty_critical_cve_per_item
+        penalty: float = min(self.settings.penalty_critical_cve_max, round(raw_penalty, 2))
+        cve_list: str = ", ".join([f"{c.cve_id} ({c.aging_days}d)" for c in aging_critical])
 
         return FactorPenalty(
             factor_name="CRITICAL_CVE_AGING",
@@ -119,10 +149,17 @@ class RiskEngine:
     def evaluate_edr(self, edr_coverage: float) -> FactorPenalty:
         """
         Evaluate Endpoint Detection & Response (EDR) agent deployment coverage.
-        Benchmark: >= 85% endpoint coverage.
+
+        Benchmark: >= 85% (0.85) endpoint coverage.
         Applies penalty for coverage deficit below benchmark, scaled up to PENALTY_EDR_MAX (20.0 pts).
+
+        Args:
+            edr_coverage: Active EDR agent deployment ratio (0.0 to 1.0).
+
+        Returns:
+            FactorPenalty: Actuarial factor penalty breakdown for EDR agent deployment coverage.
         """
-        benchmark = self.settings.edr_agent_coverage_threshold
+        benchmark: float = self.settings.edr_agent_coverage_threshold
         if edr_coverage >= benchmark:
             return FactorPenalty(
                 factor_name="EDR_AGENT_COVERAGE",
@@ -133,9 +170,9 @@ class RiskEngine:
                 actuarial_rationale="Comprehensive EDR provides behavioral containment and forensic visibility to halt lateral intrusion.",
             )
 
-        deficit = benchmark - edr_coverage
+        deficit: float = benchmark - edr_coverage
         # Scaled penalty: deficit * 111.11 produces ~10.0 pts at 9% deficit (76% coverage), capped at 20.0
-        penalty = min(self.settings.penalty_edr_max, round(deficit * 111.11, 2))
+        penalty: float = min(self.settings.penalty_edr_max, round(deficit * 111.11, 2))
         return FactorPenalty(
             factor_name="EDR_AGENT_COVERAGE",
             penalty_points=penalty,
@@ -148,8 +185,16 @@ class RiskEngine:
     def compute_risk_score(self, telemetry: TelemetrySnapshot) -> tuple[float, list[FactorPenalty]]:
         """
         Aggregate base score and itemized factor penalties into a total risk score (0.0 - 100.0).
+
+        Args:
+            telemetry: TelemetrySnapshot containing observed security posture metrics.
+
+        Returns:
+            tuple[float, list[FactorPenalty]]:
+                - aggregate_score: Clamped overall risk score between 0.0 and 100.0.
+                - penalties: Detailed list of factor penalties evaluated by the engine.
         """
-        base_score = self.settings.base_risk_score
+        base_score: float = self.settings.base_risk_score
         penalties: list[FactorPenalty] = [
             self.evaluate_mfa(telemetry.mfa_enforcement_rate),
             self.evaluate_rdp(telemetry.exposed_rdp_port, telemetry.open_ports),
@@ -157,12 +202,20 @@ class RiskEngine:
             self.evaluate_edr(telemetry.edr_agent_coverage),
         ]
 
-        total_penalty = sum(p.penalty_points for p in penalties)
-        aggregate_score = min(100.0, max(0.0, round(base_score + total_penalty, 2)))
+        total_penalty: float = sum(p.penalty_points for p in penalties)
+        aggregate_score: float = min(100.0, max(0.0, round(base_score + total_penalty, 2)))
         return aggregate_score, penalties
 
     def determine_risk_tier(self, score: float) -> RiskTier:
-        """Classify aggregate score into standard actuarial risk tiers."""
+        """
+        Classify aggregate score into standard actuarial risk tiers.
+
+        Args:
+            score: Aggregate risk score (0.0 to 100.0).
+
+        Returns:
+            RiskTier: Categorical risk tier (LOW, MEDIUM, HIGH, CRITICAL).
+        """
         if score < self.settings.risk_score_monitor_threshold:
             return RiskTier.LOW
         elif score < self.settings.risk_score_review_threshold:
@@ -174,10 +227,18 @@ class RiskEngine:
 
     def determine_policy_action(self, score: float) -> PolicyAction:
         """
-        Map aggregate score to automated underwriting policy action:
+        Map aggregate score to automated underwriting policy action.
+
+        Decision Rules:
         - Score < 40.0: NOMINAL (Standard in-force terms)
-        - 40.0 <= Score <= 60.0: MONITOR (Advisory logged)
-        - Score > 60.0: REVIEW_REQUIRED (Triggers PolicyCenter Activity)
+        - 40.0 <= Score <= 60.0: MONITOR (Advisory notice logged)
+        - Score > 60.0: REVIEW_REQUIRED (Triggers PolicyCenter Underwriter Activity)
+
+        Args:
+            score: Aggregate risk score (0.0 to 100.0).
+
+        Returns:
+            PolicyAction: Prescribed underwriting action (NOMINAL, MONITOR, REVIEW_REQUIRED).
         """
         if score < self.settings.risk_score_monitor_threshold:
             return PolicyAction.NOMINAL
