@@ -63,31 +63,70 @@ class IngestionService:
         try:
             logger.info("Starting NVD ingestion run %s (correlation_id=%s)", run.ingestion_run_id, run.correlation_id)
 
-            async for raw_item in self.nvd_client.fetch_all_vulnerabilities(
-                cve_id=request.cve_id,
-                pub_start_date=request.pub_start_date,
-                pub_end_date=request.pub_end_date,
-                last_mod_start_date=request.last_mod_start_date,
-                last_mod_end_date=request.last_mod_end_date,
-                has_kev=request.has_kev,
-                results_per_page=request.results_per_page or 2000,
-                start_index=request.start_index or 0,
-                max_records=request.max_records,
-            ):
-                records_received += 1
-                try:
-                    parsed_vuln = parse_nvd_cve_item(raw_item)
-                    _, was_inserted = self.vuln_repo.upsert_vulnerability(
-                        data=parsed_vuln,
-                        ingestion_run_id=run.ingestion_run_id,
-                    )
-                    if was_inserted:
-                        records_inserted += 1
-                    else:
-                        records_updated += 1
-                except Exception as parse_err:
-                    logger.warning("Skipping malformed CVE item in run %s: %s", run.ingestion_run_id, str(parse_err))
-                    records_skipped += 1
+            target_cves: list[str] = []
+            if request.cve_ids:
+                target_cves.extend([c.strip() for c in request.cve_ids if c and c.strip()])
+            if request.cve_id:
+                for item in request.cve_id.split(","):
+                    c_clean = item.strip()
+                    if c_clean and c_clean not in target_cves:
+                        target_cves.append(c_clean)
+
+            if target_cves:
+                for target_id in target_cves:
+                    try:
+                        page_data = await self.nvd_client.fetch_page(cve_id=target_id)
+                        vulnerabilities = page_data.get("vulnerabilities", [])
+                        if not vulnerabilities:
+                            logger.warning("Targeted CVE %s not found in NVD response", target_id)
+                            records_skipped += 1
+                            continue
+                        for raw_item in vulnerabilities:
+                            records_received += 1
+                            try:
+                                parsed_vuln = parse_nvd_cve_item(raw_item)
+                                _, was_inserted = self.vuln_repo.upsert_vulnerability(
+                                    data=parsed_vuln,
+                                    ingestion_run_id=run.ingestion_run_id,
+                                    )
+                                if was_inserted:
+                                    records_inserted += 1
+                                else:
+                                    records_updated += 1
+                            except Exception as parse_err:
+                                logger.warning("Skipping malformed CVE item in run %s: %s", run.ingestion_run_id, str(parse_err))
+                                records_skipped += 1
+                    except Exception as fetch_err:
+                        logger.warning("Error fetching targeted CVE %s in run %s: %s", target_id, run.ingestion_run_id, str(fetch_err))
+                        records_skipped += 1
+            else:
+                # Prevent silent unbounded crawl by applying safety limit (defaults to 100) if not specified
+                effective_max = request.max_records if request.max_records is not None else 100
+                async for raw_item in self.nvd_client.fetch_all_vulnerabilities(
+                    cve_id=None,
+                    pub_start_date=request.pub_start_date,
+                    pub_end_date=request.pub_end_date,
+                    last_mod_start_date=request.last_mod_start_date,
+                    last_mod_end_date=request.last_mod_end_date,
+                    has_kev=request.has_kev,
+                    results_per_page=request.results_per_page or 2000,
+                    start_index=request.start_index or 0,
+                    max_records=effective_max,
+                ):
+                    records_received += 1
+                    try:
+                        parsed_vuln = parse_nvd_cve_item(raw_item)
+                        _, was_inserted = self.vuln_repo.upsert_vulnerability(
+                            data=parsed_vuln,
+                            ingestion_run_id=run.ingestion_run_id,
+                        )
+                        if was_inserted:
+                            records_inserted += 1
+                        else:
+                            records_updated += 1
+                    except Exception as parse_err:
+                        logger.warning("Skipping malformed CVE item in run %s: %s", run.ingestion_run_id, str(parse_err))
+                        records_skipped += 1
 
             status = "SUCCESS"
             if records_skipped > 0 and (records_inserted > 0 or records_updated > 0):

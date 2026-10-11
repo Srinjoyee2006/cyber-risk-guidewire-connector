@@ -142,12 +142,12 @@ class PrioritizationRepository:
             if kev is True:
                 stmt = stmt.join(
                     ExploitationStatus,
-                    Vulnerability.vulnerability_id == ExploitationStatus.vulnerability_id,
+                    Vulnerability.cve_id == ExploitationStatus.cve_id,
                 ).where(ExploitationStatus.kev_flag.is_(True))
             elif kev is False:
                 stmt = stmt.outerjoin(
                     ExploitationStatus,
-                    Vulnerability.vulnerability_id == ExploitationStatus.vulnerability_id,
+                    Vulnerability.cve_id == ExploitationStatus.cve_id,
                 ).where(
                     (ExploitationStatus.exploitation_status_id.is_(None))
                     | (ExploitationStatus.kev_flag.is_(False))

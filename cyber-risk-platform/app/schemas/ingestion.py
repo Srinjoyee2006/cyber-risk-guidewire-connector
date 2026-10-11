@@ -19,7 +19,12 @@ class IngestionRunRequest(BaseModel):
     cve_id: Optional[str] = Field(
         default=None,
         alias="cveId",
-        description="Filter by specific CVE ID (e.g., 'CVE-2024-38077')",
+        description="Filter by specific CVE ID (e.g., 'CVE-2024-38077') or comma-separated list of IDs",
+    )
+    cve_ids: Optional[list[str]] = Field(
+        default=None,
+        alias="cveIds",
+        description="Filter by one or more specified CVE IDs (e.g. ['CVE-2021-44228', 'CVE-2024-38077'])",
     )
     pub_start_date: Optional[str] = Field(
         default=None,
@@ -62,7 +67,7 @@ class IngestionRunRequest(BaseModel):
     max_records: Optional[int] = Field(
         default=None,
         ge=1,
-        description="Optional safety ceiling capping the maximum number of records to ingest in this run",
+        description="Visible safety limit capping maximum records to ingest in this run to avoid unbounded NVD crawl (defaults to 100 for broad crawl)",
     )
 
 
@@ -75,7 +80,7 @@ class KevIngestionRunRequest(BaseModel):
     max_records: Optional[int] = Field(
         default=None,
         ge=1,
-        description="Optional safety limit capping the number of KEV entries to ingest (e.g. 50 or 100 for fast interactive testing; omit for full catalog)",
+        description="Optional safety limit capping KEV entries to ingest (e.g. 50 or 100; omit to process the entire single CISA KEV catalog feed of ~1,700+ entries)",
     )
 
 
