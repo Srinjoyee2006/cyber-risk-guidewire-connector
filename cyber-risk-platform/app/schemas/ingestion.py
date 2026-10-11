@@ -66,6 +66,19 @@ class IngestionRunRequest(BaseModel):
     )
 
 
+class KevIngestionRunRequest(BaseModel):
+    """
+    Optional parameters for triggering a CISA KEV ingestion job.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    max_records: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="Optional safety limit capping the number of KEV entries to ingest (e.g. 50 or 100 for fast interactive testing; omit for full catalog)",
+    )
+
+
 class IngestionRunResponse(BaseModel):
     """
     Status and audit record for an executed data ingestion run.

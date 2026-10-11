@@ -1,6 +1,6 @@
 """
 CyberRisk-Guidewire-Connector (CRGC)
-Ingestion Orchestration Service
+Ingestion Orchestration Service - NVD CVEs & CISA KEV
 """
 
 import logging
@@ -11,8 +11,10 @@ from sqlalchemy.orm import Session
 from app.models.ingestion import DataIngestionRun
 from app.repositories.ingestion_repository import IngestionRepository
 from app.repositories.vulnerability_repository import VulnerabilityRepository
+from app.repositories.exploitation_repository import ExploitationRepository
 from app.schemas.ingestion import IngestionRunRequest
 from app.services.nvd_client import NvdClient, parse_nvd_cve_item, NvdClientError
+from app.services.kev_client import CisaKevClient, parse_kev_entry, CisaKevClientError
 
 logger = logging.getLogger("crgc.services.ingestion")
 
@@ -24,11 +26,14 @@ class IngestionService:
         self,
         db: Session,
         nvd_client: Optional[NvdClient] = None,
+        kev_client: Optional[CisaKevClient] = None,
     ) -> None:
         self.db: Session = db
         self.ingestion_repo = IngestionRepository(db)
         self.vuln_repo = VulnerabilityRepository(db)
+        self.exploitation_repo = ExploitationRepository(db)
         self.nvd_client: NvdClient = nvd_client or NvdClient()
+        self.kev_client: CisaKevClient = kev_client or CisaKevClient()
 
     async def execute_nvd_ingestion(
         self,
@@ -102,6 +107,98 @@ class IngestionService:
 
         except Exception as exc:
             logger.error("NVD Ingestion job %s encountered fatal error: %s", run.ingestion_run_id, str(exc), exc_info=True)
+            return self.ingestion_repo.update_run(
+                run_id=run.ingestion_run_id,
+                status="FAILED",
+                records_received=records_received,
+                records_inserted=records_inserted,
+                records_updated=records_updated,
+                records_skipped=records_skipped,
+                error_message=str(exc),
+            )
+
+    async def execute_cisa_kev_ingestion(
+        self,
+        max_records: Optional[int] = None,
+        correlation_id: Optional[UUID] = None,
+    ) -> DataIngestionRun:
+        """
+        Execute an end-to-end CISA Known Exploited Vulnerabilities (KEV) catalog ingestion run.
+
+        1. Creates a RUNNING DataIngestionRun record.
+        2. Retrieves official KEV catalog JSON.
+        3. Normalizes each KEV entry and matches to vulnerabilities table by cve_id.
+        4. Idempotently upserts into exploitation_status table in batches for high throughput.
+        5. Updates and finalizes DataIngestionRun metrics.
+        """
+        source_url = self.kev_client.settings.cisa_kev_catalog_url
+        run = self.ingestion_repo.create_run(
+            source="CISA_KEV_CATALOG",
+            source_url=source_url,
+            correlation_id=correlation_id,
+        )
+
+        records_received = 0
+        records_inserted = 0
+        records_updated = 0
+        records_skipped = 0
+
+        try:
+            logger.info("Starting CISA KEV ingestion run %s (correlation_id=%s)", run.ingestion_run_id, run.correlation_id)
+            catalog_payload = await self.kev_client.fetch_catalog()
+            raw_entries = catalog_payload.get("vulnerabilities", [])
+
+            if max_records is not None and max_records > 0:
+                raw_entries = raw_entries[:max_records]
+
+            # Process entries and commit in batches of 100 for optimal performance
+            batch_size = 100
+            for i, raw_entry in enumerate(raw_entries, 1):
+                records_received += 1
+                try:
+                    parsed_entry = parse_kev_entry(raw_entry, source_url=source_url)
+                    cve_id = parsed_entry["cve_id"]
+
+                    # Check for matching NVD vulnerability record
+                    matching_vuln = self.vuln_repo.get_by_cve_id(cve_id)
+                    linked_vuln_id = matching_vuln.vulnerability_id if matching_vuln else None
+
+                    should_commit = (i % batch_size == 0) or (i == len(raw_entries))
+                    _, was_inserted = self.exploitation_repo.upsert_exploitation_status(
+                        data=parsed_entry,
+                        ingestion_run_id=run.ingestion_run_id,
+                        vulnerability_id=linked_vuln_id,
+                        auto_commit=should_commit,
+                    )
+
+                    if was_inserted:
+                        records_inserted += 1
+                    else:
+                        records_updated += 1
+                except Exception as parse_err:
+                    logger.warning("Skipping malformed KEV entry in run %s: %s", run.ingestion_run_id, str(parse_err))
+                    records_skipped += 1
+
+            self.db.commit()
+
+            status = "SUCCESS"
+            if records_skipped > 0 and (records_inserted > 0 or records_updated > 0):
+                status = "PARTIAL_SUCCESS"
+            elif records_received == 0 and records_skipped > 0:
+                status = "FAILED"
+
+            return self.ingestion_repo.update_run(
+                run_id=run.ingestion_run_id,
+                status=status,
+                records_received=records_received,
+                records_inserted=records_inserted,
+                records_updated=records_updated,
+                records_skipped=records_skipped,
+                error_message=None,
+            )
+
+        except Exception as exc:
+            logger.error("CISA KEV Ingestion job %s encountered fatal error: %s", run.ingestion_run_id, str(exc), exc_info=True)
             return self.ingestion_repo.update_run(
                 run_id=run.ingestion_run_id,
                 status="FAILED",

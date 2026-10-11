@@ -4,14 +4,14 @@ Vulnerability Ingestion API Endpoints
 """
 
 import logging
-from typing import Annotated
+from typing import Annotated, Optional
 from uuid import UUID, uuid4
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Body, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.repositories.ingestion_repository import IngestionRepository
-from app.schemas.ingestion import IngestionRunRequest, IngestionRunResponse
+from app.schemas.ingestion import IngestionRunRequest, KevIngestionRunRequest, IngestionRunResponse
 from app.services.ingestion_service import IngestionService
 
 logger = logging.getLogger("crgc.api.ingestion")
@@ -41,6 +41,24 @@ async def run_nvd_ingestion(
     """Trigger an on-demand NVD CVE ingestion job."""
     correlation_id = uuid4()
     run = await service.execute_nvd_ingestion(request=request, correlation_id=correlation_id)
+    return IngestionRunResponse.model_validate(run)
+
+
+@router.post(
+    "/kev/run",
+    response_model=IngestionRunResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Trigger CISA KEV Ingestion Job",
+    description="Ingests CISA Known Exploited Vulnerabilities catalog JSON, linking existing CVEs and recording exploitation telemetry.",
+)
+async def run_cisa_kev_ingestion(
+    service: Annotated[IngestionService, Depends(get_ingestion_service)],
+    request: Optional[KevIngestionRunRequest] = Body(default=None),
+) -> IngestionRunResponse:
+    """Trigger an on-demand CISA KEV catalog ingestion and enrichment job."""
+    correlation_id = uuid4()
+    max_records = request.max_records if request else None
+    run = await service.execute_cisa_kev_ingestion(max_records=max_records, correlation_id=correlation_id)
     return IngestionRunResponse.model_validate(run)
 
 

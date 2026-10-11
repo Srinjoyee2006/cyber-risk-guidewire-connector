@@ -8,6 +8,8 @@ from app.api.v1.telemetry import router as telemetry_router
 from app.api.v1.assessments import router as assessments_router
 from app.api.v1.ingestion import router as ingestion_router
 from app.api.v1.vulnerabilities import router as vulnerabilities_router
+from app.api.v1.exploitation import router as exploitation_router
+from app.api.v1.prioritization import router as prioritization_router
 
 api_v1_router = APIRouter(prefix="/v1")
 
@@ -16,3 +18,5 @@ api_v1_router.include_router(telemetry_router)
 api_v1_router.include_router(assessments_router)
 api_v1_router.include_router(ingestion_router)
 api_v1_router.include_router(vulnerabilities_router)
+api_v1_router.include_router(exploitation_router)
+api_v1_router.include_router(prioritization_router)

@@ -220,6 +220,112 @@ class Settings(BaseSettings):
         description="Default number of CVE results per page for NVD requests",
     )
 
+    # --------------------------------------------------------------------------
+    # CISA Known Exploited Vulnerabilities (KEV) Catalog Configuration
+    # --------------------------------------------------------------------------
+    cisa_kev_catalog_url: str = Field(
+        default="https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
+        description="Official CISA KEV catalog JSON endpoint",
+    )
+    cisa_kev_request_timeout: float = Field(
+        default=30.0,
+        description="HTTP request timeout for CISA KEV catalog fetch in seconds",
+    )
+
+
+    # --------------------------------------------------------------------------
+    # Vulnerability Prioritization Engine (Public Vulnerability Intelligence)
+    # --------------------------------------------------------------------------
+    prioritization_ruleset_version: str = Field(
+        default="v1.0.0",
+        description="Version identifier of the deterministic vulnerability prioritization scoring ruleset",
+    )
+    # Priority Band Thresholds
+    priority_band_p1_threshold: float = Field(
+        default=75.0,
+        ge=0.0,
+        le=100.0,
+        description="Minimum score threshold for Priority P1 (Critical triage)",
+    )
+    priority_band_p2_threshold: float = Field(
+        default=50.0,
+        ge=0.0,
+        le=100.0,
+        description="Minimum score threshold for Priority P2 (High triage)",
+    )
+    priority_band_p3_threshold: float = Field(
+        default=25.0,
+        ge=0.0,
+        le=100.0,
+        description="Minimum score threshold for Priority P3 (Medium triage)",
+    )
+    # Rule Score Weights (Configuration-driven, heuristic/transparent, not actuarially calibrated)
+    weight_kev_listed: float = Field(
+        default=35.0,
+        ge=0.0,
+        le=100.0,
+        description="Score weight for active presence in CISA Known Exploited Vulnerabilities catalog",
+    )
+    weight_cvss_critical: float = Field(
+        default=25.0,
+        ge=0.0,
+        le=100.0,
+        description="Score weight for CVSS base score >= 9.0",
+    )
+    weight_cvss_high: float = Field(
+        default=15.0,
+        ge=0.0,
+        le=100.0,
+        description="Score weight for CVSS base score >= 7.0 and < 9.0",
+    )
+    weight_remote_exploitable: float = Field(
+        default=15.0,
+        ge=0.0,
+        le=100.0,
+        description="Score weight for network attack vector (AV:N)",
+    )
+    weight_low_privileges_required: float = Field(
+        default=10.0,
+        ge=0.0,
+        le=100.0,
+        description="Score weight for no privileges required (PR:N)",
+    )
+    weight_kev_due_date_near: float = Field(
+        default=10.0,
+        ge=0.0,
+        le=100.0,
+        description="Score weight for KEV remediation due date within the next 14 days",
+    )
+    weight_recently_published: float = Field(
+        default=5.0,
+        ge=0.0,
+        le=100.0,
+        description="Score weight for NVD publication date within the last 30 days",
+    )
+    # Rule Parameter Thresholds
+    cvss_critical_threshold: float = Field(
+        default=9.0,
+        ge=0.0,
+        le=10.0,
+        description="CVSS score threshold for critical classification",
+    )
+    cvss_high_threshold: float = Field(
+        default=7.0,
+        ge=0.0,
+        le=10.0,
+        description="CVSS score threshold for high classification",
+    )
+    kev_due_date_near_days: int = Field(
+        default=14,
+        ge=1,
+        description="Days threshold for approaching KEV remediation due date",
+    )
+    recently_published_days: int = Field(
+        default=30,
+        ge=1,
+        description="Days threshold for recently published CVEs",
+    )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

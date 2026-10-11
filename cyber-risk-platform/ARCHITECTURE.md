@@ -123,9 +123,67 @@ CRGC exposes the following HTTP endpoints documented via OpenAPI / Swagger UI:
    - `ingestion_run_id` (UUID FK -> `data_ingestion_runs.ingestion_run_id`)
    - `created_at`, `updated_at` (Timestamps)
 
+3. **`exploitation_status`** (CISA KEV Enrichment):
+   - `exploitation_status_id` (UUID PK)
+   - `vulnerability_id` (Nullable UUID FK -> `vulnerabilities.vulnerability_id`)
+   - `cve_id` (Unique Text, indexed)
+   - `kev_flag` (Boolean, default True)
+   - `kev_date_added` (Nullable Date)
+   - `kev_due_date` (Nullable Date)
+   - `required_action` (Nullable Text)
+   - `vulnerability_name` (Nullable Text)
+   - `known_ransomware_use` (Nullable Boolean)
+   - `source` (Text, default 'CISA_KEV')
+   - `source_url` (Text)
+   - `retrieved_at` (Timestamp with timezone)
+   - `raw_payload` (Complete KEV JSON entry)
+   - `ingestion_run_id` (UUID FK -> `data_ingestion_runs.ingestion_run_id`)
+   - `created_at`, `updated_at` (Timestamps)
+
+4. **`vulnerability_prioritizations`** (Vulnerability Intelligence Prioritization):
+   - `prioritization_id` (UUID PK)
+   - `vulnerability_id` (Nullable UUID FK -> `vulnerabilities.vulnerability_id`)
+   - `cve_id` (Text, indexed)
+   - `priority` (Text, indexed: 'P1', 'P2', 'P3', 'P4')
+   - `priority_score` (Float, indexed: 0.0 to 100.0)
+   - `reason_codes` (JSON list of triggered rule codes)
+   - `factor_results` (JSON list of factor breakdowns: rule_code, triggered, score_contribution, evidence, rationale)
+   - `ruleset_version` (Text, indexed: e.g. 'v1.0.0')
+   - `insured_impact` (Text: 'UNKNOWN_UNTIL_AUTHORIZED_ASSET_DATA_IS_PROVIDED')
+   - `input_snapshot` (JSON snapshot of evaluated fields)
+   - `assessed_at` (Timestamp with timezone)
+   - `created_at`, `updated_at` (Timestamps)
+
 ---
 
-## 5. Current RiskEngine Rules
+## 5. Vulnerability Prioritization Engine (Public Intelligence Only)
+
+The [VulnerabilityPrioritizationEngine](file:///d:/New%20folder/cyber-risk-platform/app/core/vulnerability_prioritization_engine.py) provides deterministic, transparent threat scoring for ingested public CVE vulnerabilities.
+
+### Business Boundary & Non-Claims Notice
+* **Public Intelligence Only**: Evaluates public weaponization and severity metrics from NIST NVD and CISA KEV.
+* **No Insured Impact Claimed**: Prioritization does NOT evaluate asset inventory or insured installation state.
+* **Non-Actuarial Weights**: Weights and thresholds are configuration-driven, transparent heuristics and must NOT be represented as actuarially validated or empirically calibrated loss predictors.
+* **Permanent Marker**: Every prioritization result explicitly records `insured_impact = "UNKNOWN_UNTIL_AUTHORIZED_ASSET_DATA_IS_PROVIDED"`.
+
+### Ruleset (`v1.0.0`) & Configuration Weights
+1. **`KEV_LISTED`** (+35.0 pts): CVE listed in CISA KEV (`kev_flag = True`).
+2. **`CVSS_CRITICAL`** (+25.0 pts): CVSS base score $\ge 9.0$.
+3. **`CVSS_HIGH`** (+15.0 pts): CVSS base score $\ge 7.0$ and $< 9.0$.
+4. **`REMOTE_EXPLOITABLE`** (+15.0 pts): CVSS vector indicates Network attack vector (`AV:N`).
+5. **`LOW_PRIVILEGES_REQUIRED`** (+10.0 pts): CVSS vector indicates No Privileges Required (`PR:N`).
+6. **`KEV_DUE_DATE_NEAR`** (+10.0 pts): Remediation due date is within the next 14 days (or overdue).
+7. **`RECENTLY_PUBLISHED`** (+5.0 pts): NVD publication date is within the last 30 days.
+
+### Deterministic Priority Bands
+* **P1**: Score $\ge 75.0$ (Critical urgency)
+* **P2**: $50.0 \le \text{Score} < 75.0$ (High urgency)
+* **P3**: $25.0 \le \text{Score} < 50.0$ (Medium urgency)
+* **P4**: $\text{Score} < 25.0$ (Low urgency)
+
+---
+
+## 6. Current RiskEngine Rules (Insured Organization Posture)
 
 The [RiskEngine](file:///d:/New%20folder/cyber-risk-platform/app/core/risk_engine.py) provides 100% deterministic, explainable actuarial scoring without opaque black-box machine learning. The total aggregate risk score is calculated on a scale from `0.0` to `100.0`.
 
