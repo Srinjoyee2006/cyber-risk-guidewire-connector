@@ -2,38 +2,57 @@
 
 ## 1. Business Positioning & Purpose
 
-**CyberRisk-Guidewire-Connector (CRGC)** is an enterprise edge advisory engine designed to accelerate continuous cyber-risk posture assessment, coverage-gap quantification, and underwriting review workflows for commercial cyber insurance.
+**CyberRisk-Guidewire-Connector (CRGC)** operates as an enterprise Cyber Vulnerability Intelligence, Prioritization, and Underwriting Advisory Service designed to bridge public vulnerability intelligence feeds with commercial cyber insurance underwriting workflows.
 
 ### System Boundaries & Guarantees
 * **Guidewire PolicyCenter as System of Record**: Guidewire PolicyCenter (v10.2.1) remains the sole authoritative system of record for policy terms, coverages, endorsements, and policy status.
-* **Advisory Recommendations Only**: CRGC evaluates telemetry and provides decision-support recommendations to underwriters.
+* **Advisory Recommendations Only**: CRGC evaluates security posture and provides decision-support recommendations to underwriters.
 * **Strict Non-Automated Policy Binding**: CRGC **never** automatically binds, changes, cancels, or reprices policies. All policy modifications require human underwriter adjudication and explicit endorsement issuance within PolicyCenter.
+* **Vulnerability Intelligence vs. Insured Exposure Distinction**: Real-world vulnerability feeds (NVD and CISA KEV) provide empirical data regarding vulnerability severity, weaponization, and exploitability. However, public feeds do NOT indicate whether a specific insured organization has that software deployed. Therefore, the vulnerability intelligence layer exclusively ingests and normalizes public vulnerability data without unilaterally computing an insured company's overall risk score.
 
 ---
 
 ## 2. Component Architecture Overview
 
-CRGC follows a clean modular architecture separating routing, schemas, actuarial engines, services, and configuration:
+CRGC follows a clean modular architecture separating routing, schemas, repositories, actuarial engines, services, and configuration:
 
 ```
 cyber-risk-platform/
+├── alembic/                     # Database migrations
+│   ├── versions/                # Versioned migration scripts
+│   └── env.py                   # Migration environment & engine configuration
 ├── config/
-│   └── settings.py              # Pydantic v2 BaseSettings configuration
+│   └── settings.py              # Pydantic v2 BaseSettings (DB, NVD, Guidewire)
 ├── app/
-│   ├── main.py                  # ASGI factory, middleware, system diagnostic endpoints
+│   ├── main.py                  # ASGI factory, middleware, diagnostic endpoints
 │   ├── api/
 │   │   └── v1/
-│   │       ├── router.py        # Centralized v1 router mounting sub-routers
+│   │       ├── router.py        # Centralized v1 router mounting all sub-routers
+│   │       ├── ingestion.py     # NVD CVE ingestion job trigger & run history
+│   │       ├── vulnerabilities.py # Normalized CVE intelligence queries & filters
 │   │       ├── telemetry.py     # Posture ingestion & retrieval endpoints
 │   │       └── assessments.py   # Risk scoring & Guidewire dispatch endpoints
 │   ├── core/
 │   │   ├── risk_engine.py       # Deterministic actuarial scoring engine
 │   │   └── coverage_engine.py   # Policy endorsement & financial gap engine
+│   ├── db/
+│   │   ├── base.py              # SQLAlchemy 2.x DeclarativeBase
+│   │   └── session.py           # Engine & SessionLocal dependency
+│   ├── models/
+│   │   ├── ingestion.py         # DataIngestionRun SQLAlchemy model
+│   │   └── vulnerability.py     # Vulnerability SQLAlchemy model
+│   ├── repositories/
+│   │   ├── ingestion_repository.py     # Ingestion run history data access
+│   │   └── vulnerability_repository.py # Idempotent CVE persistence & search
 │   ├── schemas/
+│   │   ├── ingestion.py         # Ingestion run request & response Pydantic models
+│   │   ├── vulnerability.py     # Vulnerability intelligence Pydantic models
 │   │   ├── telemetry.py         # TelemetrySnapshot & CVE Pydantic models
 │   │   ├── risk.py              # Assessment, Penalty & Recommendation models
 │   │   └── guidewire.py         # Guidewire JSON:API specification models
 │   └── services/
+│       ├── nvd_client.py        # NIST NVD API 2.0 client & parser
+│       ├── ingestion_service.py # Ingestion run coordinator & upsert logic
 │       └── guidewire_client.py  # Asynchronous Guidewire Cloud REST client
 ├── data/
 │   └── scenarios.json           # Pre-configured deterministic test scenarios
@@ -50,6 +69,10 @@ CRGC exposes the following HTTP endpoints documented via OpenAPI / Swagger UI:
 |---|---|---|---|
 | `GET` | `/` | System | Service metadata, operational status, and actuarial benchmark overview. |
 | `GET` | `/health` | System | Healthcheck probe reporting Guidewire connectivity status and mode. |
+| `POST` | `/api/v1/ingestion/nvd/run` | Ingestion | Triggers on-demand NVD CVE API 2.0 ingestion with pagination and idempotent upsert. |
+| `GET` | `/api/v1/ingestion/runs` | Ingestion | Retrieves historical vulnerability ingestion execution records and metrics. |
+| `GET` | `/api/v1/vulnerabilities` | Vulnerabilities | Lists normalized vulnerability intelligence records with severity and keyword filters. |
+| `GET` | `/api/v1/vulnerabilities/{cve_id}` | Vulnerabilities | Fetches detailed vulnerability intelligence including CWE, CPE, references, and preserved raw NVD payload. |
 | `POST` | `/api/v1/telemetry/ingest` | Telemetry | Ingests a new security posture snapshot for a policyholder. |
 | `GET` | `/api/v1/telemetry/{policy_number}/latest` | Telemetry | Fetches the most recent telemetry snapshot stored for a policy. |
 | `GET` | `/api/v1/telemetry` | Telemetry | Lists summary metadata for all currently tracked policies. |
@@ -61,13 +84,54 @@ CRGC exposes the following HTTP endpoints documented via OpenAPI / Swagger UI:
 
 ---
 
-## 4. Current RiskEngine Rules
+## 4. Vulnerability Intelligence & NVD Ingestion Layer
+
+### Data Ingestion Architecture
+* **NIST NVD API 2.0 Client** (`https://services.nvd.nist.gov/rest/json/cves/2.0`):
+  - Supports query filters: `cveId`, `pubStartDate`, `pubEndDate`, `lastModStartDate`, `lastModEndDate`, `hasKev`, `resultsPerPage`, `startIndex`.
+  - Offset-based automatic pagination reading `totalResults`, `startIndex`, and `resultsPerPage`.
+  - Rate-limit adherence with configurable delays (`nvd_rate_limit_delay`).
+  - Secure API key authorization: injects `apiKey` in request headers when configured (`NVD_API_KEY`), never in the URL.
+* **Idempotent Persistence**:
+  - One database row per unique `cve_id`.
+  - Re-running ingestion updates existing rows (`records_updated`) instead of creating duplicates (`records_inserted == 0`).
+  - Preserves complete upstream JSON payload in `raw_payload`.
+
+### Database Schema (SQLAlchemy 2.x & Alembic)
+1. **`data_ingestion_runs`**:
+   - `ingestion_run_id` (UUID PK)
+   - `source` (Text, default 'NVD_CVE_API')
+   - `source_url` (Text)
+   - `retrieved_at` (Timestamp with timezone)
+   - `status` (Text: SUCCESS, PARTIAL_SUCCESS, FAILED, RUNNING)
+   - `records_received`, `records_inserted`, `records_updated`, `records_skipped` (Integers)
+   - `error_message` (Nullable Text)
+   - `correlation_id` (UUID)
+2. **`vulnerabilities`**:
+   - `vulnerability_id` (UUID PK)
+   - `cve_id` (Unique Text, indexed)
+   - `source` (Text, default 'NVD')
+   - `source_identifier` (Text)
+   - `published_at`, `last_modified_at` (Timestamps with timezone)
+   - `vuln_status` (Text)
+   - `description` (Text)
+   - `cvss_version`, `cvss_base_score`, `cvss_severity`, `cvss_vector`
+   - `cwe_ids` (JSON list of CWE strings)
+   - `cpe_criteria` (JSON list of CPE criteria strings)
+   - `references_json` (JSON list of advisory links)
+   - `raw_payload` (Complete NVD JSON)
+   - `ingestion_run_id` (UUID FK -> `data_ingestion_runs.ingestion_run_id`)
+   - `created_at`, `updated_at` (Timestamps)
+
+---
+
+## 5. Current RiskEngine Rules
 
 The [RiskEngine](file:///d:/New%20folder/cyber-risk-platform/app/core/risk_engine.py) provides 100% deterministic, explainable actuarial scoring without opaque black-box machine learning. The total aggregate risk score is calculated on a scale from `0.0` to `100.0`.
 
 ### Scoring Calculation
 $$\text{Aggregate Risk Score} = \min(100.0, \max(0.0, \text{Base Score} + \sum \text{Penalties}))$$
-* **Base Risk Score**: Defaults to `10.0` (configurable in settings).
+* **Base Risk Score**: Defaults to `5.0` (configurable in settings).
 
 ### Factor Penalty Rules
 1. **Multi-Factor Authentication (MFA) Enforcement**:
@@ -96,7 +160,7 @@ $$\text{Aggregate Risk Score} = \min(100.0, \max(0.0, \text{Base Score} + \sum \
 
 ---
 
-## 5. Current CoverageEngine Behavior
+## 6. Current CoverageEngine Behavior
 
 The [CoverageEngine](file:///d:/New%20folder/cyber-risk-platform/app/core/coverage_engine.py) analyzes in-force policy structures (default: $\$5\text{M}$ Aggregate Limit, $\$2.5\text{M}$ Ransomware Sublimit, $\$50\text{K}$ Retention Deductible) against the evaluated risk posture:
 
@@ -120,7 +184,7 @@ The [CoverageEngine](file:///d:/New%20folder/cyber-risk-platform/app/core/covera
 
 ---
 
-## 6. Current Guidewire Mock Behavior
+## 7. Current Guidewire Mock Behavior
 
 When running with `GW_MOCK_MODE=true` (the default setting in [config/settings.py](file:///d:/New%20folder/cyber-risk-platform/config/settings.py)), [GuidewireClient](file:///d:/New%20folder/cyber-risk-platform/app/services/guidewire_client.py) avoids external network calls and generates synthetic responses adhering strictly to the **Guidewire PolicyCenter 10.2.1 Cloud REST API** JSON:API standards:
 
@@ -138,23 +202,23 @@ When running with `GW_MOCK_MODE=true` (the default setting in [config/settings.p
 
 ---
 
-## 7. Current In-Memory Stores
+## 8. Current In-Memory Stores
 
-The application currently manages state in thread-safe process memory dictionaries:
+While vulnerability intelligence and ingestion executions are persisted in SQLite via SQLAlchemy, the existing ephemeral simulation stores remain available:
 
 * **`_telemetry_store: Dict[str, TelemetrySnapshot]`** (in [app/api/v1/telemetry.py](file:///d:/New%20folder/cyber-risk-platform/app/api/v1/telemetry.py)):
   - Stores the latest cybersecurity telemetry snapshot indexed by `policy_number`.
   - Updated upon every `POST /api/v1/telemetry/ingest` or scenario execution.
 * **`_assessments_store: Dict[str, RiskAssessmentResult]`** (in [app/api/v1/assessments.py](file:///d:/New%20folder/cyber-risk-platform/app/api/v1/assessments.py)):
-  - Retains all completed actuarial risk evaluations indexed by `assessment_id`.
+  - Retains completed actuarial risk evaluations indexed by `assessment_id`.
   - Used for audit queries (`GET /api/v1/assessments/{assessment_id}`) and listing history.
 
 ---
 
-## 8. Known Limitations
+## 9. Known Limitations
 
-1. **Ephemeral State**: In-memory stores (`_telemetry_store` and `_assessments_store`) are not persisted across application restarts.
-2. **Single-Tenant / In-Process**: Telemetry and assessment stores are not distributed across horizontal worker instances.
-3. **No Database Integration**: External persistent relational storage (e.g. PostgreSQL) and caching/event streams (e.g. Redis, Kafka) are not yet integrated.
-4. **Predefined Scenarios**: Underwriting scenarios are loaded statically from [data/scenarios.json](file:///d:/New%20folder/cyber-risk-platform/data/scenarios.json).
-5. **No Frontend Portal**: Interaction is currently conducted via REST API calls, automated scripts (`run_demo.py`), or OpenAPI Swagger UI (`/docs`).
+1. **Vulnerability Feed vs Internal Asset Mapping**: NVD records describe general software flaws; they do not indicate whether an insured organization has that specific software or version running.
+2. **No Policy/Organization DB Tables Yet**: Policy and insured company entities are not yet modeled in relational tables (planned for subsequent phases).
+3. **Local SQLite Primary**: SQLite is used for local development and testing (`crgc.db`). Models are engineered for direct PostgreSQL compatibility (`UUID`, `JSON`, `DateTime(timezone=True)`).
+4. **Guidewire Live Integration**: Default execution runs in mock simulation mode (`GW_MOCK_MODE=true`).
+5. **Predefined Scenarios**: Underwriting scenarios remain loaded from [data/scenarios.json](file:///d:/New%20folder/cyber-risk-platform/data/scenarios.json).

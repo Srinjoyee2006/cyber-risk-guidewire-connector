@@ -181,6 +181,45 @@ class Settings(BaseSettings):
         description="Maximum penalty points for missing endpoint detection and response (EDR)",
     )
 
+    # --------------------------------------------------------------------------
+    # Database Persistence (SQLite local / PostgreSQL compatible)
+    # --------------------------------------------------------------------------
+    database_url: str = Field(
+        default="sqlite:///./crgc.db",
+        description="Database connection URL (SQLite or PostgreSQL)",
+    )
+    db_echo: bool = Field(
+        default=False,
+        description="SQLAlchemy echo SQL statements",
+    )
+
+    # --------------------------------------------------------------------------
+    # NVD API v2.0 Configuration
+    # --------------------------------------------------------------------------
+    nvd_api_base_url: str = Field(
+        default="https://services.nvd.nist.gov/rest/json/cves/2.0",
+        description="Base URL for NVD CVE REST API v2.0",
+    )
+    nvd_api_key: str | None = Field(
+        default=None,
+        description="Optional NVD API key for higher rate limits",
+    )
+    nvd_request_timeout: float = Field(
+        default=30.0,
+        description="HTTP request timeout for NVD API calls in seconds",
+    )
+    nvd_rate_limit_delay: float = Field(
+        default=0.6,
+        ge=0.0,
+        description="Delay between sequential NVD API requests in seconds",
+    )
+    nvd_default_results_per_page: int = Field(
+        default=2000,
+        ge=1,
+        le=2000,
+        description="Default number of CVE results per page for NVD requests",
+    )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

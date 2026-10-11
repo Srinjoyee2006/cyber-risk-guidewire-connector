@@ -40,12 +40,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     configure_logging(settings)
     logger = logging.getLogger("crgc.lifecycle")
 
-    logger.info("=" * 70)
     logger.info("Initializing CyberRisk-Guidewire-Connector (CRGC) v1.0.0")
     logger.info("Target PolicyCenter Version: %s", settings.gw_policycenter_version)
     logger.info("Guidewire Mock Mode: %s", "ENABLED (Local Simulated)" if settings.gw_mock_mode else "DISABLED (Live GWCP)")
     logger.info("Actuarial Thresholds: Monitor=%.1f | Review=%.1f", settings.risk_score_monitor_threshold, settings.risk_score_review_threshold)
     logger.info("=" * 70)
+
+    # Initialize relational database tables
+    try:
+        from app.db.base import Base
+        from app.db.session import engine
+        import app.models  # ensure models are registered
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database schema initialized successfully (%s).", settings.database_url)
+    except Exception as db_err:
+        logger.warning("Database schema auto-creation encountered notice: %s", str(db_err))
 
     yield
 
