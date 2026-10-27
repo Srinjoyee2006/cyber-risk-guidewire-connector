@@ -19,9 +19,12 @@ import type {
 } from '../types/api'
 import { PriorityBadge, KevBadge, CvssBadge } from '../components/Badges'
 import { BoundaryNotice } from '../components/BoundaryNotice'
+import { OrganizationRiskCalculationSection } from '../components/OrganizationRiskCalculationSection'
+import { ScoreDistinctionCard } from '../components/ScoreDistinctionCard'
 
 export const OverviewPage: React.FC = () => {
   const [loading, setLoading] = useState(true)
+
   const [error, setError] = useState<string | null>(null)
 
   const [overviewStats, setOverviewStats] = useState<OverviewStatsResponse | null>(null)
@@ -336,6 +339,13 @@ export const OverviewPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Part B: Visible "How is Organization Risk Calculated?" Section */}
+      <OrganizationRiskCalculationSection defaultOpen={true} />
+
+      {/* Part C: Explicit Distinction Between the Three Score Scales */}
+      <ScoreDistinctionCard defaultOpen={true} />
     </div>
   )
 }
+

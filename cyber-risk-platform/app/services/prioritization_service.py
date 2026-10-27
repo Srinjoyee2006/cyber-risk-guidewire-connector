@@ -129,3 +129,89 @@ class PrioritizationService:
             p4_count=p4,
             results=results,
         )
+
+    def recalculate_priority_for_cve(
+        self,
+        cve_id: str,
+        now: Optional[datetime] = None,
+    ) -> Optional[dict]:
+        """
+        Recalculate priority for a specific CVE and detect whether its score or priority band changed.
+        Returns a dictionary with change metadata or None if CVE not found.
+        """
+        vuln = self.vuln_repo.get_by_cve_id(cve_id.strip())
+        if not vuln:
+            return None
+
+        existing_prio = self.prioritization_repo.get_by_cve_id(cve_id.strip())
+        old_priority = existing_prio.priority if existing_prio else None
+        old_score = existing_prio.priority_score if existing_prio else None
+
+        enriched_data = self.vuln_repo.to_enriched_dict(vuln)
+        eval_result = self.engine.prioritize_vulnerability(
+            vulnerability_data=enriched_data,
+            now=now,
+        )
+
+        record, was_inserted = self.prioritization_repo.upsert_prioritization(
+            data=eval_result,
+            vulnerability_id=vuln.vulnerability_id,
+            auto_commit=True,
+        )
+
+        new_priority = record.priority
+        new_score = record.priority_score
+        priority_changed = (old_priority is not None) and (old_priority != new_priority)
+
+        return {
+            "cve_id": cve_id.strip(),
+            "was_inserted": was_inserted,
+            "old_priority": old_priority,
+            "new_priority": new_priority,
+            "old_score": old_score,
+            "new_score": new_score,
+            "priority_changed": priority_changed,
+            "result": VulnerabilityPrioritizationResponse.model_validate(record),
+        }
+
+    def recalculate_priorities(
+        self,
+        cve_ids: Optional[list[str]] = None,
+        now: Optional[datetime] = None,
+    ) -> dict:
+        """
+        Batch recalculate priority scores across all existing prioritizations or a given CVE list.
+        Tracks newly assigned bands, score updates, and band transition counts.
+        """
+        eval_time = now or datetime.now(timezone.utc)
+        if cve_ids:
+            target_ids = [c.strip() for c in cve_ids if c and c.strip()]
+        else:
+            all_prios = self.prioritization_repo.list_results(limit=1000)
+            target_ids = [p.cve_id for p in all_prios]
+
+        total_recalculated = 0
+        changed_count = 0
+        changes = []
+
+        for cid in target_ids:
+            recalc = self.recalculate_priority_for_cve(cid, now=eval_time)
+            if recalc:
+                total_recalculated += 1
+                if recalc["priority_changed"]:
+                    changed_count += 1
+                    changes.append({
+                        "cve_id": cid,
+                        "old_priority": recalc["old_priority"],
+                        "new_priority": recalc["new_priority"],
+                        "old_score": recalc["old_score"],
+                        "new_score": recalc["new_score"],
+                    })
+
+        return {
+            "total_recalculated": total_recalculated,
+            "priorities_changed_count": changed_count,
+            "changes": changes,
+            "recalculated_at": eval_time.isoformat(),
+        }
+

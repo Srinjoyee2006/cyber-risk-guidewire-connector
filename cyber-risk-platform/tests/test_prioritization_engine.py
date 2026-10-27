@@ -149,3 +149,56 @@ class TestPrioritizationEngineRules:
         assert "KEV_DUE_DATE_NEAR" in res1["reason_codes"]
         assert res1["insured_impact"] == "UNKNOWN_UNTIL_AUTHORIZED_ASSET_DATA_IS_PROVIDED"
         assert res1["ruleset_version"] == "v1.0.0"
+
+    def test_priority_band_boundary_values(self, engine: VulnerabilityPrioritizationEngine):
+        """
+        Verify priority band mapping immediately below, at, and above thresholds:
+        - P1: >= 75.0
+        - P2: >= 50.0 and < 75.0
+        - P3: >= 25.0 and < 50.0
+        - P4: < 25.0
+        """
+        # P4 vs P3 (boundary at 25.0)
+        assert engine.determine_priority_band(24.9) == PriorityBand.P4
+        assert engine.determine_priority_band(25.0) == PriorityBand.P3
+        assert engine.determine_priority_band(25.1) == PriorityBand.P3
+
+        # P3 vs P2 (boundary at 50.0)
+        assert engine.determine_priority_band(49.9) == PriorityBand.P3
+        assert engine.determine_priority_band(50.0) == PriorityBand.P2
+        assert engine.determine_priority_band(50.1) == PriorityBand.P2
+
+        # P2 vs P1 (boundary at 75.0)
+        assert engine.determine_priority_band(74.9) == PriorityBand.P2
+        assert engine.determine_priority_band(75.0) == PriorityBand.P1
+        assert engine.determine_priority_band(75.1) == PriorityBand.P1
+
+        # Clamping: raw sum exceeding 100.0 (35 + 25 + 15 + 10 + 10 + 5 = 100.0 max, but potential 110 if misconfigured)
+        assert engine.determine_priority_band(100.0) == PriorityBand.P1
+        assert engine.determine_priority_band(0.0) == PriorityBand.P4
+
+    def test_score_clamping_to_hundred(self, engine: VulnerabilityPrioritizationEngine):
+        """Prioritization score is always strictly clamped to [0.0, 100.0]."""
+        fixed_time = datetime(2024, 8, 10, 12, 0, 0, tzinfo=timezone.utc)
+        # All factors triggered:
+        # KEV_LISTED: 35.0
+        # CVSS_CRITICAL: 25.0
+        # REMOTE_EXPLOITABLE: 15.0
+        # LOW_PRIVILEGES_REQUIRED: 10.0
+        # KEV_DUE_DATE_NEAR: 10.0
+        # RECENTLY_PUBLISHED: 5.0
+        # Raw sum = 100.0
+        vuln_all = {
+            "cve_id": "CVE-2024-99999",
+            "cvss_base_score": 10.0,
+            "cvss_severity": "CRITICAL",
+            "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+            "published_at": datetime(2024, 8, 1, tzinfo=timezone.utc),
+            "kev_flag": True,
+            "kev_due_date": date(2024, 8, 15),
+        }
+        res = engine.prioritize_vulnerability(vuln_all, now=fixed_time)
+        assert res["priority_score"] == 100.0
+        assert res["priority"] == "P1"
+        assert len(res["reason_codes"]) == 6
+

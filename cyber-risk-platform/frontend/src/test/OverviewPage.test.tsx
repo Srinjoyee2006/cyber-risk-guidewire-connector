@@ -176,4 +176,47 @@ describe('OverviewPage', () => {
 
     expect(screen.getByRole('button', { name: /Retry Connection/i })).toBeInTheDocument()
   })
+
+  it('renders "How is Organization Risk Calculated?" section with formula and benchmarks', async () => {
+    vi.mocked(apiClient.getOverviewStats).mockResolvedValue({
+      total_vulnerabilities: 10,
+      total_kev: 5,
+      kev_matched_vulnerabilities: 2,
+      total_prioritized: 3,
+      p1_count: 1,
+      p2_count: 1,
+      p3_count: 1,
+      p4_count: 0,
+    })
+    vi.mocked(apiClient.getVulnerabilities).mockResolvedValue([])
+    vi.mocked(apiClient.getPrioritizationResults).mockResolvedValue([])
+    vi.mocked(apiClient.getIngestionRuns).mockResolvedValue([])
+
+    render(
+      <MemoryRouter>
+        <OverviewPage />
+      </MemoryRouter>
+    )
+
+    // Verify Organization Risk section is rendered
+    expect(await screen.findByText('How is Organization Risk Calculated?')).toBeInTheDocument()
+
+    // Verify formula
+    expect(screen.getByText(/5\.0 \(Base\) \+ MFA_Penalty \+ RDP_Penalty \+ Critical_CVE_Penalty \+ EDR_Penalty/i)).toBeInTheDocument()
+
+    // Verify factor benchmarks
+    expect(screen.getByText('MFA Enforcement Deficit')).toBeInTheDocument()
+    expect(screen.getByText('Public RDP Exposure')).toBeInTheDocument()
+    expect(screen.getByText('Critical CVE Aging (> 14 Days)')).toBeInTheDocument()
+    expect(screen.getByText('EDR Agent Coverage Deficit')).toBeInTheDocument()
+
+    // Verify PolicyCenter Action thresholds
+    expect(screen.getByText(/NOMINAL \(< 40\.0\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/MONITOR \(40\.0 – 60\.0\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/REVIEW_REQUIRED \(> 60\.0\)/i)).toBeInTheDocument()
+
+    // Verify Score Distinction Guide is present on overview
+    expect(screen.getByText('Score Scales & Dimensions Distinction Guide')).toBeInTheDocument()
+  })
 })
+

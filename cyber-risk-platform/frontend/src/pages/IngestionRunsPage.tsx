@@ -271,6 +271,34 @@ export const IngestionRunsPage: React.FC = () => {
 
       <BoundaryNotice variant="inline" />
 
+      {/* Architecture & Synchronization Mode Clarification */}
+      <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-300 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-white flex items-center gap-1.5">
+            <Clock className="w-4 h-4 text-indigo-400" />
+            Ingestion Architecture & Synchronization Status
+          </span>
+          <span className="px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800/60 font-mono text-[10px]">
+            Mode: On-Demand Manual Triggers
+          </span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 text-[11px] text-slate-400">
+          <div>
+            <span className="font-semibold text-slate-200 block">Verified Manual Workflow</span>
+            Ingestion runs are executed on-demand via authenticated endpoints. Deduplication and updates are idempotent on CVE ID.
+          </div>
+          <div>
+            <span className="font-semibold text-slate-200 block">Future Scheduled Sync</span>
+            Automated recurring synchronization (e.g. Celery beat or cron workers) is designed as a planned enhancement.
+          </div>
+          <div>
+            <span className="font-semibold text-slate-200 block">Guidewire Mock Mode</span>
+            PolicyCenter dispatch operates against a local deterministic mock simulator (GW_MOCK_MODE=true).
+          </div>
+        </div>
+      </div>
+
+
       {notification && (
         <div
           className={`p-3.5 rounded-lg border text-sm flex items-center justify-between ${

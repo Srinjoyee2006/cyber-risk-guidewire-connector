@@ -218,3 +218,165 @@ class TestDeterministicScenarios:
         assert rec.action == PolicyAction.MONITOR
         assert rec.ransomware_sublimit_adjustment_pct == 0.0
         assert "ADV-CYBER-HYGIENE-NOTICE" in rec.recommended_endorsement_code
+
+
+class TestRiskEngineBoundariesAndValidation:
+    """
+    Extensive verification for thresholds immediately below, at, and above boundaries,
+    missing inputs, invalid telemetry values, and score ranges.
+    """
+
+    def test_mfa_boundaries_below_at_above(self, risk_engine: RiskEngine):
+        # Above benchmark (80.1%)
+        p_above = risk_engine.evaluate_mfa(0.801)
+        assert p_above.penalty_points == 0.0
+
+        # Exactly at benchmark (80.0%)
+        p_at = risk_engine.evaluate_mfa(0.800)
+        assert p_at.penalty_points == 0.0
+
+        # Immediately below benchmark (79.9% -> 0.1% deficit -> 0.1 pts)
+        p_below = risk_engine.evaluate_mfa(0.799)
+        assert p_below.penalty_points == 0.1
+
+        # At penalty cap (50.0% -> 30.0% deficit -> 30.0 pts)
+        p_cap = risk_engine.evaluate_mfa(0.500)
+        assert p_cap.penalty_points == 30.0
+
+        # Beyond penalty cap (49.9% -> 30.1% deficit -> clamped to 30.0 pts)
+        p_beyond = risk_engine.evaluate_mfa(0.499)
+        assert p_beyond.penalty_points == 30.0
+
+    def test_rdp_exposure_boundaries(self, risk_engine: RiskEngine):
+        # Closed RDP
+        p_closed = risk_engine.evaluate_rdp(exposed_rdp=False, open_ports=[80, 443])
+        assert p_closed.penalty_points == 0.0
+
+        # Exposed via scanner flag
+        p_flag = risk_engine.evaluate_rdp(exposed_rdp=True, open_ports=[])
+        assert p_flag.penalty_points == 25.0
+
+        # Exposed via port 3389
+        p_port = risk_engine.evaluate_rdp(exposed_rdp=False, open_ports=[3389])
+        assert p_port.penalty_points == 25.0
+
+        # Both flag and port present: single 25.0 penalty, no duplicate accumulation
+        p_both = risk_engine.evaluate_rdp(exposed_rdp=True, open_ports=[3389])
+        assert p_both.penalty_points == 25.0
+
+    def test_critical_cve_aging_boundaries_below_at_above(self, risk_engine: RiskEngine):
+        # CVSS 9.0 at exact SLA aging boundary (14 days): 0.0 penalty
+        cve_at_sla = [CVEItem(cve_id="CVE-2024-0001", severity=CVESeverity.CRITICAL, cvss_score=9.0, aging_days=14)]
+        p_at = risk_engine.evaluate_critical_cves(cve_at_sla)
+        assert p_at.penalty_points == 0.0
+
+        # CVSS 9.0 immediately above SLA boundary (15 days): 12.5 pts
+        cve_above_sla = [CVEItem(cve_id="CVE-2024-0002", severity=CVESeverity.CRITICAL, cvss_score=9.0, aging_days=15)]
+        p_above = risk_engine.evaluate_critical_cves(cve_above_sla)
+        assert p_above.penalty_points == 12.5
+
+        # CVSS 8.9 (immediately below critical threshold) aging 30 days: 0.0 penalty
+        cve_non_crit = [CVEItem(cve_id="CVE-2024-0003", severity=CVESeverity.HIGH, cvss_score=8.9, aging_days=30)]
+        p_non_crit = risk_engine.evaluate_critical_cves(cve_non_crit)
+        assert p_non_crit.penalty_points == 0.0
+
+        # 3 aging critical CVEs: 3 * 12.5 = 37.5 -> capped at 35.0 pts
+        cves_3 = [
+            CVEItem(cve_id=f"CVE-2024-100{i}", severity=CVESeverity.CRITICAL, cvss_score=9.5, aging_days=20)
+            for i in range(3)
+        ]
+        p_3 = risk_engine.evaluate_critical_cves(cves_3)
+        assert p_3.penalty_points == 35.0
+
+    def test_edr_coverage_boundaries_below_at_above(self, risk_engine: RiskEngine):
+        # Above benchmark (85.1%)
+        p_above = risk_engine.evaluate_edr(0.851)
+        assert p_above.penalty_points == 0.0
+
+        # At benchmark (85.0%)
+        p_at = risk_engine.evaluate_edr(0.850)
+        assert p_at.penalty_points == 0.0
+
+        # Immediately below benchmark (84.9%)
+        p_below = risk_engine.evaluate_edr(0.849)
+        assert p_below.penalty_points > 0.0
+
+        # At and beyond cap (67.0% or 0.0%): clamped at 20.0 pts
+        p_cap = risk_engine.evaluate_edr(0.670)
+        assert p_cap.penalty_points == 20.0
+        p_zero = risk_engine.evaluate_edr(0.0)
+        assert p_zero.penalty_points == 20.0
+
+    def test_risk_tier_and_policy_action_exact_threshold_boundaries(self, risk_engine: RiskEngine):
+        # Low / Nominal boundary: 39.9 vs 40.0
+        assert risk_engine.determine_risk_tier(39.9) == RiskTier.LOW
+        assert risk_engine.determine_policy_action(39.9) == PolicyAction.NOMINAL
+
+        assert risk_engine.determine_risk_tier(40.0) == RiskTier.MEDIUM
+        assert risk_engine.determine_policy_action(40.0) == PolicyAction.MONITOR
+
+        assert risk_engine.determine_risk_tier(40.1) == RiskTier.MEDIUM
+        assert risk_engine.determine_policy_action(40.1) == PolicyAction.MONITOR
+
+        # Medium / Monitor boundary: 59.9 vs 60.0 vs 60.1
+        assert risk_engine.determine_risk_tier(59.9) == RiskTier.MEDIUM
+        assert risk_engine.determine_policy_action(59.9) == PolicyAction.MONITOR
+
+        # At exact boundary 60.0: Tier is HIGH (<60.0 is Medium), while PolicyAction is MONITOR (<=60.0 is Monitor)
+        assert risk_engine.determine_risk_tier(60.0) == RiskTier.HIGH
+        assert risk_engine.determine_policy_action(60.0) == PolicyAction.MONITOR
+
+        assert risk_engine.determine_risk_tier(60.1) == RiskTier.HIGH
+        assert risk_engine.determine_policy_action(60.1) == PolicyAction.REVIEW_REQUIRED
+
+        # High vs Critical boundary: 79.9 vs 80.0
+        assert risk_engine.determine_risk_tier(79.9) == RiskTier.HIGH
+        assert risk_engine.determine_policy_action(79.9) == PolicyAction.REVIEW_REQUIRED
+
+        assert risk_engine.determine_risk_tier(80.0) == RiskTier.CRITICAL
+        assert risk_engine.determine_policy_action(80.0) == PolicyAction.REVIEW_REQUIRED
+
+        assert risk_engine.determine_risk_tier(80.1) == RiskTier.CRITICAL
+        assert risk_engine.determine_policy_action(80.1) == PolicyAction.REVIEW_REQUIRED
+
+    def test_score_clamping_to_zero_and_hundred(self, risk_engine: RiskEngine):
+        # Max theoretical penalties: 5.0 base + 30.0 MFA + 25.0 RDP + 35.0 CVE + 20.0 EDR = 115.0
+        worst_snapshot = TelemetrySnapshot(
+            tenant_id="TENANT-MAX",
+            company_name="Max Risk Corp",
+            policy_number="POL-MAX",
+            mfa_enforcement_rate=0.0,   # 30.0 pts
+            exposed_rdp_port=True,       # 25.0 pts
+            open_ports=[3389],
+            critical_cves=[
+                CVEItem(cve_id=f"CVE-2024-990{i}", severity=CVESeverity.CRITICAL, cvss_score=10.0, aging_days=60)
+                for i in range(4)
+            ],                           # 35.0 pts
+            edr_agent_coverage=0.0,      # 20.0 pts
+        )
+        score, penalties = risk_engine.compute_risk_score(worst_snapshot)
+        assert score == 100.0  # Clamped at 100.0, does not overflow
+        assert sum(p.penalty_points for p in penalties) == 110.0
+
+
+    def test_telemetry_schema_validation_rejects_invalid_inputs(self):
+        from pydantic import ValidationError
+
+        # Invalid MFA > 1.0
+        with pytest.raises(ValidationError):
+            TelemetrySnapshot(
+                tenant_id="T1", company_name="C1", policy_number="P1",
+                mfa_enforcement_rate=1.5,
+                exposed_rdp_port=False, open_ports=[], critical_cves=[],
+                edr_agent_coverage=0.9,
+            )
+
+        # Invalid EDR < 0.0
+        with pytest.raises(ValidationError):
+            TelemetrySnapshot(
+                tenant_id="T1", company_name="C1", policy_number="P1",
+                mfa_enforcement_rate=0.8,
+                exposed_rdp_port=False, open_ports=[], critical_cves=[],
+                edr_agent_coverage=-0.2,
+            )
+

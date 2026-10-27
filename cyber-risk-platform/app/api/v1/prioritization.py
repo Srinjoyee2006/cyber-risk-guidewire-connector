@@ -102,3 +102,20 @@ async def get_prioritization_result_by_cve(
             detail=f"Prioritization result for '{cve_id}' not found. Run /api/v1/prioritization/run first.",
         )
     return VulnerabilityPrioritizationResponse.model_validate(record)
+
+
+@router.post(
+    "/recalculate",
+    summary="Recalculate Priority Scores & Detect Changes",
+    description=(
+        "Recalculates prioritization for existing vulnerability records (or specified CVE IDs) "
+        "and detects score shifts or priority band transitions (e.g. newly added to KEV or changed CVSS)."
+    ),
+)
+async def recalculate_prioritizations(
+    service: Annotated[PrioritizationService, Depends(get_prioritization_service)],
+    cve_ids: Optional[list[str]] = Body(default=None, description="Optional subset of CVE IDs to recalculate"),
+) -> dict:
+    """Recalculate priorities and identify if any bands changed."""
+    return service.recalculate_priorities(cve_ids=cve_ids)
+

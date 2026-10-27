@@ -16,12 +16,15 @@ import type {
 } from '../types/api'
 import { PriorityBadge, KevBadge, CvssBadge } from '../components/Badges'
 import { BoundaryNotice } from '../components/BoundaryNotice'
+import { PriorityCalculationPanel } from '../components/PriorityCalculationPanel'
+import { ScoreDistinctionCard } from '../components/ScoreDistinctionCard'
 
 export const ExplorerPage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [runningPrio, setRunningPrio] = useState(false)
   const [prioNotification, setPrioNotification] = useState<string | null>(null)
+
 
   // Filter states
   const [cveSearch, setCveSearch] = useState('')
@@ -178,7 +181,14 @@ export const ExplorerPage: React.FC = () => {
         </div>
       )}
 
+      {/* Visible "How is Priority Calculated?" Panel */}
+      <PriorityCalculationPanel prioritizationsMap={prioritizationsMap} />
+
+      {/* Distinct Score Scales & Dimensions Comparison Matrix */}
+      <ScoreDistinctionCard defaultOpen={false} />
+
       {/* Filter Toolbar */}
+
       <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
         <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
