@@ -1,0 +1,39 @@
+sequenceDiagram
+    autonumber
+    actor Admin as Admin / Scheduler
+    participant API as FastAPI Ingestion Router
+    participant NVD_Svc as NVD Ingestion Service
+    participant KEV_Svc as CISA KEV Service
+    participant Ext_NVD as NIST NVD API 2.0
+    participant Ext_KEV as CISA KEV Catalog Feed
+    participant DB as SQLite / SQLAlchemy
+
+    rect rgb(240, 248, 255)
+        Note over Admin,Ext_NVD: Pipeline 1: NIST NVD Vulnerability Ingestion
+        Admin->>API: POST /api/v1/vulnerabilities/ingest/nvd (cve_id or range)
+        API->>DB: INSERT data_ingestion_runs (status='PENDING', feed='NVD')
+        API->>NVD_Svc: fetch_and_persist(startIndex, count)
+        NVD_Svc->>Ext_NVD: GET /rest/json/cves/2.0?cveId=...
+        Ext_NVD-->>NVD_Svc: HTTP 200 OK (JSON Payload)
+        NVD_Svc->>NVD_Svc: Parse & Validate (Extract CVSS v3/v2, dates, description)
+        NVD_Svc->>DB: Upsert into 'vulnerabilities' (idempotent PK check)
+        DB-->>NVD_Svc: Records Inserted: N, Records Updated: M
+        NVD_Svc->>DB: UPDATE data_ingestion_runs (status='SUCCESS', counts)
+        NVD_Svc-->>API: IngestionResult(fetched, inserted, updated)
+        API-->>Admin: HTTP 200 Ingestion Summary
+    end
+
+    rect rgb(255, 248, 240)
+        Note over Admin,Ext_KEV: Pipeline 2: CISA Known Exploited Vulnerabilities Ingestion
+        Admin->>API: POST /api/v1/exploitation-status/ingest/cisa-kev
+        API->>DB: INSERT data_ingestion_runs (status='PENDING', feed='CISA_KEV')
+        API->>KEV_Svc: fetch_and_persist_kev()
+        KEV_Svc->>Ext_KEV: GET /feeds/known_exploited_vulnerabilities.json
+        Ext_KEV-->>KEV_Svc: HTTP 200 OK (Catalog JSON)
+        KEV_Svc->>KEV_Svc: Stream Parse & Validate Pydantic Models
+        KEV_Svc->>DB: Upsert into 'exploitation_status' (kev_flag=True, dates, ransomware)
+        DB-->>KEV_Svc: Persisted Records
+        KEV_Svc->>DB: UPDATE data_ingestion_runs (status='SUCCESS', counts)
+        KEV_Svc-->>API: IngestionResult(fetched, inserted, updated)
+        API-->>Admin: HTTP 200 KEV Sync Summary
+    end

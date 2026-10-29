@@ -1,0 +1,35 @@
+flowchart TD
+    Start([Input: CVE Identifier]) --> QueryDB[(Query 'vulnerabilities' & 'exploitation_status')]
+    QueryDB --> CheckExists{CVE Exists?}
+    CheckExists -- No --> Err[Return HTTP 404 Not Found]
+    CheckExists -- Yes --> ExtractAttrs[Extract CVSS Base Score & Vector<br/>Extract KEV Flag & Ransomware Use]
+    
+    ExtractAttrs --> BaseCalc["Step 1: Calculate Base Severity Score<br/>S_base = CVSS_base * 10.0 (Range: 0.0 - 100.0)"]
+    
+    BaseCalc --> CheckKEV{Is KEV Flag = True?}
+    CheckKEV -- Yes --> AddKEV["Step 2: Apply Active Exploitation Penalty<br/>P_kev = +30.0 points"]
+    CheckKEV -- No --> ZeroKEV["P_kev = 0.0 points"]
+    
+    AddKEV --> CheckRansomware{Ransomware Use = 'Known'?}
+    ZeroKEV --> CheckRansomware
+    
+    CheckRansomware -- Yes --> AddRansom["Step 3: Apply Ransomware Multiplier<br/>P_ransom = +15.0 points"]
+    CheckRansomware -- No --> ZeroRansom["P_ransom = 0.0 points"]
+    
+    AddRansom --> RawSum["Step 4: Compute Raw Priority Score<br/>RawScore = S_base + P_kev + P_ransom"]
+    ZeroRansom --> RawSum
+    
+    RawSum --> ClampScore["Step 5: Mathematical Clamping<br/>PriorityScore = min(100.0, max(0.0, RawScore))"]
+    
+    ClampScore --> RouteTier{PriorityScore Thresholds}
+    RouteTier -- "Score >= 75.0" --> TierP1["Tier P1 (CRITICAL)<br/>Action: Immediate Remediation / 72h SLA"]
+    RouteTier -- "50.0 <= Score < 75.0" --> TierP2["Tier P2 (HIGH)<br/>Action: Remediate within 14 Days"]
+    RouteTier -- "25.0 <= Score < 50.0" --> TierP3["Tier P3 (MEDIUM)<br/>Action: Remediate within 30 Days"]
+    RouteTier -- "Score < 25.0" --> TierP4["Tier P4 (LOW)<br/>Action: Routine Maintenance Triage"]
+    
+    TierP1 --> Persist[(Insert into 'vulnerability_prioritizations')]
+    TierP2 --> Persist
+    TierP3 --> Persist
+    TierP4 --> Persist
+    
+    Persist --> End([Return PrioritizationResult with Factor Breakdown])

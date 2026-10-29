@@ -1,0 +1,171 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 850" width="100%" height="100%" style="background:#ffffff; font-family:'Segoe UI', Inter, Arial, sans-serif;">
+    
+    <defs>
+        <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#eff6ff" />
+            <stop offset="100%" stop-color="#dbeafe" />
+        </linearGradient>
+        <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#faf5ff" />
+            <stop offset="100%" stop-color="#f3e8ff" />
+        </linearGradient>
+        <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#fffbeb" />
+            <stop offset="100%" stop-color="#fef3c7" />
+        </linearGradient>
+        <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ecfdf5" />
+            <stop offset="100%" stop-color="#d1fae5" />
+        </linearGradient>
+        <linearGradient id="roseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#fff1f2" />
+            <stop offset="100%" stop-color="#ffe4e6" />
+        </linearGradient>
+        <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%" filterUnits="userSpaceOnUse">
+            <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.15" />
+        </filter>
+        <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#475569" />
+        </marker>
+        <marker id="arrowBlue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#2563eb" />
+        </marker>
+    </defs>
+    
+    <!-- Title -->
+    <rect x="20" y="15" width="1060" height="45" rx="8" fill="#1e293b" />
+    <text x="550" y="43" fill="#ffffff" font-size="18" font-weight="bold" text-anchor="middle">Figure 4.1: CRGC High-Level Multi-Tier System Architecture</text>
+    
+    <!-- Presentation Tier -->
+    <rect x="30" y="80" width="1040" height="110" rx="8" fill="url(#blueGrad)" stroke="#3b82f6" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="50" y="105" fill="#1e3a8a" font-size="14" font-weight="bold">PRESENTATION TIER (React 19 / TypeScript / Vite / Tailwind CSS)</text>
+    <rect x="50" y="115" width="180" height="60" rx="6" fill="#ffffff" stroke="#93c5fd" />
+    <text x="140" y="140" fill="#1e293b" font-size="12" font-weight="600" text-anchor="middle">Overview Dashboard</text>
+    <text x="140" y="158" fill="#64748b" font-size="10" text-anchor="middle">Live Counts &amp; Sync Runs</text>
+    
+    <rect x="250" y="115" width="180" height="60" rx="6" fill="#ffffff" stroke="#93c5fd" />
+    <text x="340" y="140" fill="#1e293b" font-size="12" font-weight="600" text-anchor="middle">Vulnerability Explorer</text>
+    <text x="340" y="158" fill="#64748b" font-size="10" text-anchor="middle">CVE / KEV Search &amp; Triage</text>
+
+    <rect x="450" y="115" width="180" height="60" rx="6" fill="#ffffff" stroke="#93c5fd" />
+    <text x="540" y="140" fill="#1e293b" font-size="12" font-weight="600" text-anchor="middle">Priority Configuration</text>
+    <text x="540" y="158" fill="#64748b" font-size="10" text-anchor="middle">Rule Weights &amp; Thresholds</text>
+
+    <rect x="650" y="115" width="180" height="60" rx="6" fill="#ffffff" stroke="#93c5fd" />
+    <text x="740" y="140" fill="#1e293b" font-size="12" font-weight="600" text-anchor="middle">Observed Findings</text>
+    <text x="740" y="158" fill="#64748b" font-size="10" text-anchor="middle">Enterprise Asset Scans</text>
+
+    <rect x="850" y="115" width="200" height="60" rx="6" fill="#ffffff" stroke="#93c5fd" />
+    <text x="950" y="140" fill="#1e293b" font-size="12" font-weight="600" text-anchor="middle">Underwriter Terminal</text>
+    <text x="950" y="158" fill="#64748b" font-size="10" text-anchor="middle">Risk Evaluation &amp; Policy Actions</text>
+
+    <!-- Downward Flow Arrow -->
+    <path d="M 550 190 L 550 215" stroke="#2563eb" stroke-width="2" marker-end="url(#arrowBlue)" />
+    <text x="560" y="208" fill="#2563eb" font-size="11" font-weight="bold">JSON over REST HTTP</text>
+
+    <!-- API Tier -->
+    <rect x="30" y="225" width="1040" height="110" rx="8" fill="url(#purpleGrad)" stroke="#8b5cf6" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="50" y="250" fill="#581c87" font-size="14" font-weight="bold">APPLICATION API TIER (FastAPI v0.115.6 / Pydantic v2 / Uvicorn)</text>
+    
+    <rect x="50" y="260" width="220" height="60" rx="6" fill="#ffffff" stroke="#c4b5fd" />
+    <text x="160" y="285" fill="#1e293b" font-size="11" font-weight="600" text-anchor="middle">/api/v1/vulnerabilities</text>
+    <text x="160" y="303" fill="#64748b" font-size="10" text-anchor="middle">List, Detail, NVD Ingest</text>
+
+    <rect x="290" y="260" width="220" height="60" rx="6" fill="#ffffff" stroke="#c4b5fd" />
+    <text x="400" y="285" fill="#1e293b" font-size="11" font-weight="600" text-anchor="middle">/api/v1/prioritizations</text>
+    <text x="400" y="303" fill="#64748b" font-size="10" text-anchor="middle">P1-P4 Evaluation &amp; Audits</text>
+
+    <rect x="530" y="260" width="240" height="60" rx="6" fill="#ffffff" stroke="#c4b5fd" />
+    <text x="650" y="285" fill="#1e293b" font-size="11" font-weight="600" text-anchor="middle">/api/v1/organizations &amp; assets</text>
+    <text x="650" y="303" fill="#64748b" font-size="10" text-anchor="middle">Tenant &amp; Inventory Governance</text>
+
+    <rect x="790" y="260" width="260" height="60" rx="6" fill="#ffffff" stroke="#c4b5fd" />
+    <text x="920" y="285" fill="#1e293b" font-size="11" font-weight="600" text-anchor="middle">/api/v1/underwriting/evaluate</text>
+    <text x="920" y="303" fill="#64748b" font-size="10" text-anchor="middle">RiskEngine &amp; Guidewire Gateway</text>
+
+    <!-- Mid Flow Arrow -->
+    <path d="M 550 335 L 550 360" stroke="#475569" stroke-width="2" marker-end="url(#arrow)" />
+
+    <!-- Analytics & Core Engine Tier -->
+    <rect x="30" y="370" width="1040" height="120" rx="8" fill="url(#amberGrad)" stroke="#f59e0b" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="50" y="395" fill="#78350f" font-size="14" font-weight="bold">CORE PROCESSING &amp; ANALYTICS ENGINES</text>
+
+    <rect x="50" y="405" width="230" height="70" rx="6" fill="#ffffff" stroke="#fcd34d" />
+    <text x="165" y="430" fill="#1e293b" font-size="12" font-weight="600" text-anchor="middle">NVD / CISA Ingestion</text>
+    <text x="165" y="448" fill="#64748b" font-size="10" text-anchor="middle">HTTPX Async Clients &amp; Stream Parsers</text>
+    <text x="165" y="463" fill="#059669" font-size="9" text-anchor="middle">Idempotent Deduplication</text>
+
+    <rect x="300" y="405" width="240" height="70" rx="6" fill="#ffffff" stroke="#fcd34d" />
+    <text x="420" y="430" fill="#1e293b" font-size="12" font-weight="600" text-anchor="middle">PrioritizationEngine</text>
+    <text x="420" y="448" fill="#64748b" font-size="10" text-anchor="middle">Base CVSS + KEV (+30) + Ransom (+15)</text>
+    <text x="420" y="463" fill="#b45309" font-size="9" font-weight="600" text-anchor="middle">Outputs P1, P2, P3, P4 Tiers</text>
+
+    <rect x="560" y="405" width="240" height="70" rx="6" fill="#ffffff" stroke="#fcd34d" />
+    <text x="680" y="430" fill="#1e293b" font-size="12" font-weight="600" text-anchor="middle">Organization RiskEngine</text>
+    <text x="680" y="448" fill="#64748b" font-size="10" text-anchor="middle">Base 5 + MFA + RDP + CVE + EDR</text>
+    <text x="680" y="463" fill="#b45309" font-size="9" font-weight="600" text-anchor="middle">Score Clamped to [0.0, 100.0]</text>
+
+    <rect x="820" y="405" width="230" height="70" rx="6" fill="#ffffff" stroke="#fcd34d" />
+    <text x="935" y="430" fill="#1e293b" font-size="12" font-weight="600" text-anchor="middle">Coverage &amp; Policy Engine</text>
+    <text x="935" y="448" fill="#64748b" font-size="10" text-anchor="middle">Deductibles &amp; Policy Actions</text>
+    <text x="935" y="463" fill="#0284c7" font-size="9" font-weight="600" text-anchor="middle">Nominal / Monitor / Review Req</text>
+
+    <!-- Lower Flow Arrows -->
+    <path d="M 300 490 L 300 525" stroke="#475569" stroke-width="2" marker-end="url(#arrow)" />
+    <path d="M 850 490 L 850 525" stroke="#8b5cf6" stroke-width="2" marker-end="url(#arrow)" />
+
+    <!-- Persistence Tier (Left) -->
+    <rect x="30" y="535" width="560" height="280" rx="8" fill="url(#emeraldGrad)" stroke="#10b981" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="50" y="560" fill="#064e3b" font-size="14" font-weight="bold">PERSISTENCE TIER (SQLAlchemy 2.0 / SQLite 3 - cyber_risk.db)</text>
+    
+    <g transform="translate(50, 575)">
+        <rect x="0" y="0" width="240" height="42" rx="4" fill="#ffffff" stroke="#a7f3d0" />
+        <text x="10" y="18" fill="#047857" font-size="11" font-weight="bold">data_ingestion_runs</text>
+        <text x="10" y="32" fill="#64748b" font-size="9">UUID, feed, timestamps, status, counts</text>
+
+        <rect x="260" y="0" width="240" height="42" rx="4" fill="#ffffff" stroke="#a7f3d0" />
+        <text x="270" y="18" fill="#047857" font-size="11" font-weight="bold">vulnerabilities</text>
+        <text x="270" y="32" fill="#64748b" font-size="9">CVE PK, description, CVSS v3/v2</text>
+
+        <rect x="0" y="52" width="240" height="42" rx="4" fill="#ffffff" stroke="#a7f3d0" />
+        <text x="10" y="70" fill="#047857" font-size="11" font-weight="bold">exploitation_status</text>
+        <text x="10" y="84" fill="#64748b" font-size="9">CVE FK, KEV flag, dates, ransomware</text>
+
+        <rect x="260" y="52" width="240" height="42" rx="4" fill="#ffffff" stroke="#a7f3d0" />
+        <text x="270" y="70" fill="#047857" font-size="11" font-weight="bold">vulnerability_prioritizations</text>
+        <text x="270" y="84" fill="#64748b" font-size="9">Priority UUID, score, tier, audit JSON</text>
+
+        <rect x="0" y="104" width="240" height="42" rx="4" fill="#ffffff" stroke="#a7f3d0" />
+        <text x="10" y="122" fill="#047857" font-size="11" font-weight="bold">organizations</text>
+        <text x="10" y="136" fill="#64748b" font-size="9">Org UUID, ref UK, name, consent flag</text>
+
+        <rect x="260" y="104" width="240" height="42" rx="4" fill="#ffffff" stroke="#a7f3d0" />
+        <text x="270" y="122" fill="#047857" font-size="11" font-weight="bold">assets</text>
+        <text x="270" y="136" fill="#64748b" font-size="9">Asset UUID, Org FK, hostname, IP, type</text>
+
+        <rect x="130" y="156" width="240" height="42" rx="4" fill="#ffffff" stroke="#a7f3d0" />
+        <text x="140" y="174" fill="#047857" font-size="11" font-weight="bold">vulnerability_observations</text>
+        <text x="140" y="188" fill="#64748b" font-size="9">Obs UUID, Asset FK, CVE FK, scanner</text>
+    </g>
+
+    <!-- External Feeds & Guidewire Mock (Right) -->
+    <rect x="610" y="535" width="460" height="135" rx="8" fill="url(#roseGrad)" stroke="#f43f5e" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="630" y="560" fill="#881337" font-size="13" font-weight="bold">EXTERNAL THREAT INTELLIGENCE (LIVE HTTPS)</text>
+    <rect x="630" y="575" width="205" height="75" rx="6" fill="#ffffff" stroke="#fecdd3" />
+    <text x="732" y="598" fill="#1e293b" font-size="11" font-weight="bold" text-anchor="middle">NIST NVD API 2.0</text>
+    <text x="732" y="615" fill="#64748b" font-size="9" text-anchor="middle">services.nvd.nist.gov</text>
+    <text x="732" y="632" fill="#059669" font-size="9" font-weight="bold" text-anchor="middle">Live JSON CVE Feed</text>
+
+    <rect x="845" y="575" width="205" height="75" rx="6" fill="#ffffff" stroke="#fecdd3" />
+    <text x="947" y="598" fill="#1e293b" font-size="11" font-weight="bold" text-anchor="middle">CISA KEV Catalog</text>
+    <text x="947" y="615" fill="#64748b" font-size="9" text-anchor="middle">cisa.gov/feeds</text>
+    <text x="947" y="632" fill="#059669" font-size="9" font-weight="bold" text-anchor="middle">1,739+ Active Exploits</text>
+
+    <!-- Guidewire Integration Layer -->
+    <rect x="610" y="680" width="460" height="135" rx="8" fill="url(#purpleGrad)" stroke="#8b5cf6" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="630" y="705" fill="#4c1d95" font-size="13" font-weight="bold">GUIDEWIRE POLICYCENTER INTEGRATION (SIMULATED)</text>
+    <rect x="630" y="720" width="420" height="75" rx="6" fill="#ffffff" stroke="#ddd6fe" />
+    <text x="840" y="742" fill="#6b21a8" font-size="12" font-weight="bold" text-anchor="middle">Guidewire Mock Adapter (GW_MOCK_MODE=True)</text>
+    <text x="840" y="760" fill="#64748b" font-size="10" text-anchor="middle">Simulates PolicyCenter Underwriting File Activities &amp; Referral Notes</text>
+    <text x="840" y="777" fill="#d97706" font-size="9" font-weight="bold" text-anchor="middle">Architecturally Compliant; No Live Production Guidewire Account Required</text>
+</svg>

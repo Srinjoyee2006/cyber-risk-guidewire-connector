@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 680" width="100%" height="100%" style="background:#ffffff; font-family:'Segoe UI', Inter, Arial, sans-serif;">
+    
+    <defs>
+        <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#eff6ff" />
+            <stop offset="100%" stop-color="#dbeafe" />
+        </linearGradient>
+        <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#faf5ff" />
+            <stop offset="100%" stop-color="#f3e8ff" />
+        </linearGradient>
+        <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#fffbeb" />
+            <stop offset="100%" stop-color="#fef3c7" />
+        </linearGradient>
+        <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ecfdf5" />
+            <stop offset="100%" stop-color="#d1fae5" />
+        </linearGradient>
+        <linearGradient id="roseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#fff1f2" />
+            <stop offset="100%" stop-color="#ffe4e6" />
+        </linearGradient>
+        <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%" filterUnits="userSpaceOnUse">
+            <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.15" />
+        </filter>
+        <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#475569" />
+        </marker>
+        <marker id="arrowBlue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#2563eb" />
+        </marker>
+    </defs>
+    
+    <!-- Title -->
+    <rect x="20" y="15" width="960" height="40" rx="6" fill="#1e293b" />
+    <text x="500" y="41" fill="#ffffff" font-size="16" font-weight="bold" text-anchor="middle">Figure 5.1: Multi-Layer Automated Verification &amp; Quality Assurance Framework</text>
+
+    <!-- Top Summary Banner -->
+    <rect x="40" y="70" width="920" height="50" rx="6" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5" />
+    <text x="500" y="100" fill="#065f46" font-size="13" font-weight="bold" text-anchor="middle">EMPIRICAL TEST EXECUTION RESULT: 94 TOTAL AUTOMATED TESTS PASSING (100% SUCCESS RATE)</text>
+
+    <!-- Left Box: Backend Pytest (77 Tests) -->
+    <rect x="40" y="135" width="445" height="400" rx="8" fill="url(#blueGrad)" stroke="#3b82f6" stroke-width="1.5" filter="url(#shadow)" />
+    <rect x="40" y="135" width="445" height="35" rx="8" fill="#1d4ed8" />
+    <text x="55" y="158" fill="#ffffff" font-size="13" font-weight="bold">BACKEND PYTEST TEST HARNESS (77 Tests Passing)</text>
+    <text x="465" y="158" fill="#a7f3d0" font-size="11" font-weight="bold" text-anchor="end">100% PASS (5.45s)</text>
+
+    <g transform="translate(55, 185)">
+        <rect x="0" y="0" width="415" height="48" rx="4" fill="#ffffff" stroke="#bfdbfe" />
+        <text x="10" y="18" fill="#1e3a8a" font-size="11" font-weight="bold">Prioritization Engine Tests (16 Tests)</text>
+        <text x="10" y="34" fill="#64748b" font-size="9">P1-P4 rule thresholds, KEV (+30), Ransomware (+15), Clamping [0, 100]</text>
+
+        <rect x="0" y="56" width="415" height="48" rx="4" fill="#ffffff" stroke="#bfdbfe" />
+        <text x="10" y="74" fill="#1e3a8a" font-size="11" font-weight="bold">Threat Ingestion Pipelines (18 Tests)</text>
+        <text x="10" y="90" fill="#64748b" font-size="9">NVD targeted &amp; paginated ingestion, CISA KEV parsing, HTTP 429 resilience</text>
+
+        <rect x="0" y="112" width="415" height="48" rx="4" fill="#ffffff" stroke="#bfdbfe" />
+        <text x="10" y="130" fill="#1e3a8a" font-size="11" font-weight="bold">Organizations &amp; Assets API (15 Tests)</text>
+        <text x="10" y="146" fill="#64748b" font-size="9">CRUD, legal consent enforcement, unique org_ref UK, FK cascades</text>
+
+        <rect x="0" y="168" width="415" height="48" rx="4" fill="#ffffff" stroke="#bfdbfe" />
+        <text x="10" y="186" fill="#1e3a8a" font-size="11" font-weight="bold">Vulnerability Observations API (14 Tests)</text>
+        <text x="10" y="202" fill="#64748b" font-size="9">Scanner finding ingestion, asset-cve mapping, status updates</text>
+
+        <rect x="0" y="224" width="415" height="48" rx="4" fill="#ffffff" stroke="#bfdbfe" />
+        <text x="10" y="242" fill="#1e3a8a" font-size="11" font-weight="bold">RiskEngine &amp; Underwriting Gateway (14 Tests)</text>
+        <text x="10" y="258" fill="#64748b" font-size="9">Scenarios A/B/C verification, Guidewire mock note/activity payload generation</text>
+
+        <rect x="0" y="280" width="415" height="50" rx="4" fill="#f0fdf4" stroke="#86efac" />
+        <text x="10" y="298" fill="#166534" font-size="11" font-weight="bold">Isolated In-Memory Fixtures</text>
+        <text x="10" y="314" fill="#166534" font-size="9">sqlite:///:memory: database per test session; zero external network calls</text>
+    </g>
+
+    <!-- Right Box: Frontend Vitest & Build (17 Tests) -->
+    <rect x="515" y="135" width="445" height="400" rx="8" fill="url(#purpleGrad)" stroke="#8b5cf6" stroke-width="1.5" filter="url(#shadow)" />
+    <rect x="515" y="135" width="445" height="35" rx="8" fill="#6d28d9" />
+    <text x="530" y="158" fill="#ffffff" font-size="13" font-weight="bold">FRONTEND VITEST &amp; BUILD HARNESS (17 Tests)</text>
+    <text x="940" y="158" fill="#a7f3d0" font-size="11" font-weight="bold" text-anchor="end">100% PASS (6.06s)</text>
+
+    <g transform="translate(530, 185)">
+        <rect x="0" y="0" width="415" height="48" rx="4" fill="#ffffff" stroke="#ddd6fe" />
+        <text x="10" y="18" fill="#581c87" font-size="11" font-weight="bold">Overview Page Component Tests (5 Tests)</text>
+        <text x="10" y="34" fill="#64748b" font-size="9">Total CVE, KEV, P1-P4 metric card rendering, sync status cards</text>
+
+        <rect x="0" y="56" width="415" height="48" rx="4" fill="#ffffff" stroke="#ddd6fe" />
+        <text x="10" y="74" fill="#581c87" font-size="11" font-weight="bold">Explorer Page Component Tests (4 Tests)</text>
+        <text x="10" y="90" fill="#64748b" font-size="9">CVE search debouncing, KEV badge display, priority factor drawer</text>
+
+        <rect x="0" y="112" width="415" height="48" rx="4" fill="#ffffff" stroke="#ddd6fe" />
+        <text x="10" y="130" fill="#581c87" font-size="11" font-weight="bold">Prioritization Config Tests (4 Tests)</text>
+        <text x="10" y="146" fill="#64748b" font-size="9">Threshold slider inputs, weight configuration validation form</text>
+
+        <rect x="0" y="168" width="415" height="48" rx="4" fill="#ffffff" stroke="#ddd6fe" />
+        <text x="10" y="186" fill="#581c87" font-size="11" font-weight="bold">Observed Vulnerabilities Tests (4 Tests)</text>
+        <text x="10" y="202" fill="#64748b" font-size="9">Enterprise findings table, asset filtering, status triage buttons</text>
+
+        <rect x="0" y="224" width="415" height="48" rx="4" fill="#ffffff" stroke="#ddd6fe" />
+        <text x="10" y="242" fill="#581c87" font-size="11" font-weight="bold">TypeScript Static Typecheck (tsc --noEmit)</text>
+        <text x="10" y="258" fill="#047857" font-size="9" font-weight="bold">Zero compile-time type errors across all interfaces &amp; API schemas</text>
+
+        <rect x="0" y="280" width="415" height="50" rx="4" fill="#f0fdf4" stroke="#86efac" />
+        <text x="10" y="298" fill="#166534" font-size="11" font-weight="bold">Vite Production Bundle Verification</text>
+        <text x="10" y="314" fill="#166534" font-size="9">Compiled 100% cleanly in 563 ms; assets minified and tree-shaken</text>
+    </g>
+
+    <!-- Bottom Test Execution Matrix -->
+    <rect x="40" y="550" width="920" height="105" rx="8" fill="#1e293b" filter="url(#shadow)" />
+    <text x="60" y="575" fill="#ffffff" font-size="12" font-weight="bold">CONTINUOUS INTEGRATION &amp; TEST ENVIRONMENT SPECIFICATIONS</text>
+    
+    <g transform="translate(60, 585)">
+        <text x="0" y="20" fill="#94a3b8" font-size="10">Test Engine: Pytest 8.3.4 + Vitest 3.0.4</text>
+        <text x="250" y="20" fill="#94a3b8" font-size="10">Database: In-Memory SQLite 3 (Isolated)</text>
+        <text x="560" y="20" fill="#94a3b8" font-size="10">HTTP Fixtures: Unittest Mock AsyncClient</text>
+        <text x="800" y="20" fill="#4ade80" font-size="10" font-weight="bold">Status: ALL PASS</text>
+
+        <text x="0" y="42" fill="#94a3b8" font-size="10">UI Harness: React Testing Library + JSDOM</text>
+        <text x="250" y="42" fill="#94a3b8" font-size="10">Bundle Speed: 563 ms (Vite 6.0.7)</text>
+        <text x="560" y="42" fill="#94a3b8" font-size="10">Coverage: Prioritization, Ingestion, Risk</text>
+        <text x="800" y="42" fill="#4ade80" font-size="10" font-weight="bold">Exit Code: 0</text>
+    </g>
+</svg>

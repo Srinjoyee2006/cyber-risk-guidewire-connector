@@ -1,0 +1,24 @@
+flowchart TD
+    Start([Enterprise Asset Ingestion]) --> OrgReg[1. Organization Registration<br/>Assign organization_ref & display_name]
+    OrgReg --> CheckConsent{Data Authorization Flag = True?}
+    CheckConsent -- No --> RejectConsent[Reject Ingestion<br/>Legal Data Privacy Violation]
+    CheckConsent -- Yes --> AssetReg[2. Asset Inventory Registration<br/>Register Hostnames, IPs, Asset Types, Criticality]
+    
+    AssetReg --> ScannerIngest[3. Vulnerability Scanner Ingestion<br/>Import Qualys / Nessus / Tenable CSV Export]
+    
+    ScannerIngest --> ValidateAsset{Asset Exists in Organization?}
+    ValidateAsset -- No --> FlagOrphan[Reject Finding: Unmapped Asset]
+    ValidateAsset -- Yes --> CheckCVE{CVE ID in Public 'vulnerabilities'?}
+    
+    CheckCVE -- Yes --> JoinPublic[4. Relational Intelligence Joining<br/>Attach CVSS v3.1 Metrics & CISA KEV Exploitation Flags]
+    CheckCVE -- No --> InsertStub[Create Unenriched CVE Stub Record]
+    InsertStub --> JoinPublic
+    
+    JoinPublic --> CreateObs[5. Create 'vulnerability_observations' Record<br/>Set scanner_source, observed_at, raw_evidence]
+    
+    CreateObs --> TriageStatus{Analyst & Scanner Triage State}
+    TriageStatus --> StateVer[Status: VERIFIED<br/>Confirmed Vulnerable Asset]
+    TriageStatus --> StateUnver[Status: UNVERIFIED<br/>Potential False Positive]
+    TriageStatus --> StateRem[Status: REMEDIATED<br/>Patch Applied & Rescanned]
+    
+    StateVer --> UW_Dashboard[6. Enterprise Underwriting Attack Surface View<br/>Informs RiskEngine & Guidewire Underwriting Review]

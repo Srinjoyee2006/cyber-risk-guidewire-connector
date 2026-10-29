@@ -1,0 +1,33 @@
+graph TB
+    subgraph TestSuite["Automated Testing Harness (94 Total Tests Passing)"]
+        subgraph BackendTests["Backend Pytest Harness (77 Tests Passing)"]
+            T_Prio["test_vulnerability_prioritization_engine.py<br/>- P1/P2/P3/P4 Rule Invariants<br/>- KEV (+30) & Ransomware (+15) Weights<br/>- Clamping bounds [0, 100]"]
+            T_NVD["test_nvd_ingestion.py<br/>- Targeted CVE & Paginated Ingestion<br/>- Mock HTTPX Client & Resilience<br/>- Idempotent Database Upserts"]
+            T_KEV["test_kev_ingestion.py<br/>- Catalog Stream Parsing<br/>- KEV Flag Updates in SQLite<br/>- Run Telemetry Tracking"]
+            T_Org["test_organization_assets_api.py<br/>- Organization CRUD & Consent Enforcement<br/>- Asset Inventory Foreign Key Cascades"]
+            T_Obs["test_vulnerability_observations_api.py<br/>- Scanner Telemetry Ingestion<br/>- Observation Status Transitions"]
+            T_UW["test_underwriting_api.py<br/>- RiskEngine Scenario Validations<br/>- Guidewire Mock Service Integration"]
+        end
+
+        subgraph FrontendTests["Frontend Vitest Harness (17 Tests Passing)"]
+            UI_T1["OverviewPage.test.tsx<br/>- Live Metric Card Render<br/>- Backend Counts & Error States"]
+            UI_T2["ExplorerPage.test.tsx<br/>- Client-side CVE Filtering<br/>- KEV Badge & Priority Drawer"]
+            UI_T3["PrioritizationConfigPage.test.tsx<br/>- Rule Threshold Governance Form"]
+            UI_T4["ObservedVulnerabilitiesPage.test.tsx<br/>- Enterprise Findings Table Rendering"]
+        end
+
+        subgraph BuildTests["Compiler & Bundle Verification"]
+            TS_Check["TypeScript Compiler (tsc --noEmit)<br/>Zero Type Errors Across All Models"]
+            Vite_Build["Vite Production Build<br/>Compiled 100% Cleanly in 563 ms"]
+        end
+    end
+
+    subgraph TestFixtures["Test Execution Environment & Isolation"]
+        DB_Mem[(In-Memory SQLite DB<br/>sqlite:///:memory:)]
+        Mock_HTTP["Unittest Mock HTTP Layer<br/>(Simulates NVD & CISA APIs)"]
+        JSDOM["Headless JSDOM Browser<br/>(Simulates React DOM)"]
+    end
+
+    BackendTests --> DB_Mem
+    BackendTests --> Mock_HTTP
+    FrontendTests --> JSDOM

@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 780" width="100%" height="100%" style="background:#ffffff; font-family:'Segoe UI', Inter, Arial, sans-serif;">
+    
+    <defs>
+        <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#eff6ff" />
+            <stop offset="100%" stop-color="#dbeafe" />
+        </linearGradient>
+        <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#faf5ff" />
+            <stop offset="100%" stop-color="#f3e8ff" />
+        </linearGradient>
+        <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#fffbeb" />
+            <stop offset="100%" stop-color="#fef3c7" />
+        </linearGradient>
+        <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ecfdf5" />
+            <stop offset="100%" stop-color="#d1fae5" />
+        </linearGradient>
+        <linearGradient id="roseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#fff1f2" />
+            <stop offset="100%" stop-color="#ffe4e6" />
+        </linearGradient>
+        <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%" filterUnits="userSpaceOnUse">
+            <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.15" />
+        </filter>
+        <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#475569" />
+        </marker>
+        <marker id="arrowBlue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#2563eb" />
+        </marker>
+    </defs>
+    
+    <!-- Title -->
+    <rect x="20" y="15" width="1060" height="40" rx="6" fill="#1e293b" />
+    <text x="550" y="41" fill="#ffffff" font-size="16" font-weight="bold" text-anchor="middle">Figure 4.4: CRGC Database Entity-Relationship Diagram (SQLAlchemy Relational Schema)</text>
+
+    <!-- Table 1: data_ingestion_runs -->
+    <g transform="translate(30, 80)">
+        <rect x="0" y="0" width="300" height="200" rx="6" fill="#ffffff" stroke="#0ea5e9" stroke-width="1.5" filter="url(#shadow)" />
+        <rect x="0" y="0" width="300" height="30" rx="6" fill="#0284c7" />
+        <text x="15" y="20" fill="#ffffff" font-size="12" font-weight="bold">data_ingestion_runs</text>
+        <text x="15" y="50" fill="#0369a1" font-size="11" font-weight="bold">PK  run_id : UUID</text>
+        <text x="15" y="70" fill="#334155" font-size="11">    feed_type : VARCHAR(50)</text>
+        <text x="15" y="90" fill="#334155" font-size="11">    started_at : DATETIME</text>
+        <text x="15" y="110" fill="#334155" font-size="11">    completed_at : DATETIME</text>
+        <text x="15" y="130" fill="#334155" font-size="11">    status : VARCHAR(20)</text>
+        <text x="15" y="150" fill="#334155" font-size="11">    records_fetched / inserted / updated</text>
+        <text x="15" y="170" fill="#334155" font-size="11">    error_message : TEXT</text>
+    </g>
+
+    <!-- Table 2: vulnerabilities -->
+    <g transform="translate(390, 80)">
+        <rect x="0" y="0" width="320" height="230" rx="6" fill="#ffffff" stroke="#2563eb" stroke-width="1.5" filter="url(#shadow)" />
+        <rect x="0" y="0" width="320" height="30" rx="6" fill="#1d4ed8" />
+        <text x="15" y="20" fill="#ffffff" font-size="12" font-weight="bold">vulnerabilities</text>
+        <text x="15" y="50" fill="#1d4ed8" font-size="11" font-weight="bold">PK  cve_id : VARCHAR(50)</text>
+        <text x="15" y="70" fill="#334155" font-size="11">    description : TEXT</text>
+        <text x="15" y="90" fill="#334155" font-size="11">    cvss_v3_score : FLOAT</text>
+        <text x="15" y="110" fill="#334155" font-size="11">    cvss_v3_vector : VARCHAR(100)</text>
+        <text x="15" y="130" fill="#334155" font-size="11">    cvss_v2_score : FLOAT</text>
+        <text x="15" y="150" fill="#334155" font-size="11">    cvss_v2_vector : VARCHAR(100)</text>
+        <text x="15" y="170" fill="#334155" font-size="11">    published_date : DATETIME</text>
+        <text x="15" y="190" fill="#334155" font-size="11">    last_modified_date : DATETIME</text>
+        <text x="15" y="210" fill="#334155" font-size="11">    created_at / updated_at : DATETIME</text>
+    </g>
+
+    <!-- Table 3: exploitation_status -->
+    <g transform="translate(760, 80)">
+        <rect x="0" y="0" width="310" height="190" rx="6" fill="#ffffff" stroke="#e11d48" stroke-width="1.5" filter="url(#shadow)" />
+        <rect x="0" y="0" width="310" height="30" rx="6" fill="#be123c" />
+        <text x="15" y="20" fill="#ffffff" font-size="12" font-weight="bold">exploitation_status</text>
+        <text x="15" y="50" fill="#be123c" font-size="11" font-weight="bold">PK,FK  cve_id : VARCHAR(50)</text>
+        <text x="15" y="70" fill="#334155" font-size="11">    kev_flag : BOOLEAN (Default: False)</text>
+        <text x="15" y="90" fill="#334155" font-size="11">    date_added : DATETIME</text>
+        <text x="15" y="110" fill="#334155" font-size="11">    due_date : DATETIME</text>
+        <text x="15" y="130" fill="#334155" font-size="11">    known_ransomware_campaign_use</text>
+        <text x="15" y="150" fill="#334155" font-size="11">    notes : TEXT</text>
+        <text x="15" y="170" fill="#334155" font-size="11">    updated_at : DATETIME</text>
+    </g>
+
+    <!-- Table 4: vulnerability_prioritizations -->
+    <g transform="translate(390, 370)">
+        <rect x="0" y="0" width="320" height="170" rx="6" fill="#ffffff" stroke="#d97706" stroke-width="1.5" filter="url(#shadow)" />
+        <rect x="0" y="0" width="320" height="30" rx="6" fill="#b45309" />
+        <text x="15" y="20" fill="#ffffff" font-size="12" font-weight="bold">vulnerability_prioritizations</text>
+        <text x="15" y="50" fill="#b45309" font-size="11" font-weight="bold">PK  priority_id : UUID</text>
+        <text x="15" y="70" fill="#1d4ed8" font-size="11" font-weight="bold">FK  cve_id : VARCHAR(50)</text>
+        <text x="15" y="90" fill="#334155" font-size="11">    priority_score : FLOAT (0.0 - 100.0)</text>
+        <text x="15" y="110" fill="#334155" font-size="11">    priority_tier : VARCHAR(10) (P1-P4)</text>
+        <text x="15" y="130" fill="#334155" font-size="11">    factor_breakdown : JSON / TEXT</text>
+        <text x="15" y="150" fill="#334155" font-size="11">    created_at : DATETIME</text>
+    </g>
+
+    <!-- Table 5: organizations -->
+    <g transform="translate(30, 480)">
+        <rect x="0" y="0" width="300" height="170" rx="6" fill="#ffffff" stroke="#059669" stroke-width="1.5" filter="url(#shadow)" />
+        <rect x="0" y="0" width="300" height="30" rx="6" fill="#047857" />
+        <text x="15" y="20" fill="#ffffff" font-size="12" font-weight="bold">organizations</text>
+        <text x="15" y="50" fill="#047857" font-size="11" font-weight="bold">PK  organization_id : UUID</text>
+        <text x="15" y="70" fill="#047857" font-size="11" font-weight="bold">UK  organization_ref : VARCHAR(100)</text>
+        <text x="15" y="90" fill="#334155" font-size="11">    display_name : VARCHAR(255)</text>
+        <text x="15" y="110" fill="#334155" font-size="11">    data_authorization_flag : BOOLEAN</text>
+        <text x="15" y="130" fill="#334155" font-size="11">    created_at / updated_at : DATETIME</text>
+    </g>
+
+    <!-- Table 6: assets -->
+    <g transform="translate(390, 580)">
+        <rect x="0" y="0" width="320" height="180" rx="6" fill="#ffffff" stroke="#059669" stroke-width="1.5" filter="url(#shadow)" />
+        <rect x="0" y="0" width="320" height="30" rx="6" fill="#047857" />
+        <text x="15" y="20" fill="#ffffff" font-size="12" font-weight="bold">assets</text>
+        <text x="15" y="50" fill="#047857" font-size="11" font-weight="bold">PK  asset_id : UUID</text>
+        <text x="15" y="70" fill="#047857" font-size="11" font-weight="bold">FK  organization_id : UUID</text>
+        <text x="15" y="90" fill="#334155" font-size="11">    asset_ref : VARCHAR(100)</text>
+        <text x="15" y="110" fill="#334155" font-size="11">    hostname / ip_address</text>
+        <text x="15" y="130" fill="#334155" font-size="11">    asset_type : VARCHAR(50)</text>
+        <text x="15" y="150" fill="#334155" font-size="11">    criticality : VARCHAR(20)</text>
+        <text x="15" y="170" fill="#334155" font-size="11">    created_at / updated_at : DATETIME</text>
+    </g>
+
+    <!-- Table 7: vulnerability_observations -->
+    <g transform="translate(760, 480)">
+        <rect x="0" y="0" width="310" height="200" rx="6" fill="#ffffff" stroke="#7c3aed" stroke-width="1.5" filter="url(#shadow)" />
+        <rect x="0" y="0" width="310" height="30" rx="6" fill="#6d28d9" />
+        <text x="15" y="20" fill="#ffffff" font-size="12" font-weight="bold">vulnerability_observations</text>
+        <text x="15" y="50" fill="#6d28d9" font-size="11" font-weight="bold">PK  observation_id : UUID</text>
+        <text x="15" y="70" fill="#047857" font-size="11" font-weight="bold">FK  asset_id : UUID</text>
+        <text x="15" y="90" fill="#1d4ed8" font-size="11" font-weight="bold">FK  cve_id : VARCHAR(50)</text>
+        <text x="15" y="110" fill="#334155" font-size="11">    scanner_source : VARCHAR(100)</text>
+        <text x="15" y="130" fill="#334155" font-size="11">    observed_at : DATETIME</text>
+        <text x="15" y="150" fill="#334155" font-size="11">    status : VARCHAR(50) (VERIFIED, etc)</text>
+        <text x="15" y="170" fill="#334155" font-size="11">    raw_evidence : JSON</text>
+        <text x="15" y="190" fill="#334155" font-size="11">    created_at : DATETIME</text>
+    </g>
+
+    <!-- Relationships -->
+    <!-- vulnerabilities <-> exploitation_status -->
+    <path d="M 710 150 L 760 150" stroke="#be123c" stroke-width="2" marker-end="url(#arrow)" />
+    <text x="735" y="140" fill="#be123c" font-size="10" font-weight="bold" text-anchor="middle">1 : 0..1</text>
+
+    <!-- vulnerabilities <-> prioritizations -->
+    <path d="M 550 310 L 550 370" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arrow)" />
+    <text x="565" y="340" fill="#1d4ed8" font-size="10" font-weight="bold">1 : 0..N</text>
+
+    <!-- organizations <-> assets -->
+    <path d="M 330 580 L 390 630" stroke="#047857" stroke-width="2" marker-end="url(#arrow)" />
+    <text x="360" y="595" fill="#047857" font-size="10" font-weight="bold">1 : N</text>
+
+    <!-- assets <-> observations -->
+    <path d="M 710 650 L 760 620" stroke="#047857" stroke-width="2" marker-end="url(#arrow)" />
+    <text x="735" y="625" fill="#047857" font-size="10" font-weight="bold">1 : N</text>
+
+    <!-- vulnerabilities <-> observations -->
+    <path d="M 680 310 Q 750 380 850 480" stroke="#1d4ed8" stroke-width="2" stroke-dasharray="4" marker-end="url(#arrow)" fill="none" />
+    <text x="770" y="400" fill="#1d4ed8" font-size="10" font-weight="bold">1 : N (Ref)</text>
+</svg>

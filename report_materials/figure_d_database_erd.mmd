@@ -1,0 +1,82 @@
+erDiagram
+    data_ingestion_runs {
+        UUID run_id PK
+        VARCHAR feed_type
+        DATETIME started_at
+        DATETIME completed_at
+        VARCHAR status
+        INTEGER records_fetched
+        INTEGER records_inserted
+        INTEGER records_updated
+        TEXT error_message
+    }
+
+    vulnerabilities {
+        VARCHAR cve_id PK
+        TEXT description
+        FLOAT cvss_v3_score
+        VARCHAR cvss_v3_vector
+        FLOAT cvss_v2_score
+        VARCHAR cvss_v2_vector
+        DATETIME published_date
+        DATETIME last_modified_date
+        DATETIME created_at
+        DATETIME updated_at
+    }
+
+    exploitation_status {
+        VARCHAR cve_id PK, FK
+        BOOLEAN kev_flag
+        DATETIME date_added
+        DATETIME due_date
+        VARCHAR known_ransomware_campaign_use
+        TEXT notes
+        DATETIME updated_at
+    }
+
+    vulnerability_prioritizations {
+        UUID priority_id PK
+        VARCHAR cve_id FK
+        FLOAT priority_score
+        VARCHAR priority_tier
+        JSON factor_breakdown
+        DATETIME created_at
+    }
+
+    organizations {
+        UUID organization_id PK
+        VARCHAR organization_ref UK
+        VARCHAR display_name
+        BOOLEAN data_authorization_flag
+        DATETIME created_at
+        DATETIME updated_at
+    }
+
+    assets {
+        UUID asset_id PK
+        UUID organization_id FK
+        VARCHAR asset_ref
+        VARCHAR hostname
+        VARCHAR ip_address
+        VARCHAR asset_type
+        VARCHAR criticality
+        DATETIME created_at
+        DATETIME updated_at
+    }
+
+    vulnerability_observations {
+        UUID observation_id PK
+        UUID asset_id FK
+        VARCHAR cve_id FK
+        VARCHAR scanner_source
+        DATETIME observed_at
+        VARCHAR status
+        JSON raw_evidence
+        DATETIME created_at
+    }
+
+    vulnerabilities ||--o| exploitation_status : "enriched by"
+    vulnerabilities ||--o{ vulnerability_prioritizations : "evaluated in"
+    organizations ||--o{ assets : "owns"
+    assets ||--o{ vulnerability_observations : "has"
+    vulnerabilities ||--o{ vulnerability_observations : "referenced by"

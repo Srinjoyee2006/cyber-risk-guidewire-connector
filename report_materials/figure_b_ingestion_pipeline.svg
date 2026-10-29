@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 650" width="100%" height="100%" style="background:#ffffff; font-family:'Segoe UI', Inter, Arial, sans-serif;">
+    
+    <defs>
+        <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#eff6ff" />
+            <stop offset="100%" stop-color="#dbeafe" />
+        </linearGradient>
+        <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#faf5ff" />
+            <stop offset="100%" stop-color="#f3e8ff" />
+        </linearGradient>
+        <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#fffbeb" />
+            <stop offset="100%" stop-color="#fef3c7" />
+        </linearGradient>
+        <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ecfdf5" />
+            <stop offset="100%" stop-color="#d1fae5" />
+        </linearGradient>
+        <linearGradient id="roseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#fff1f2" />
+            <stop offset="100%" stop-color="#ffe4e6" />
+        </linearGradient>
+        <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%" filterUnits="userSpaceOnUse">
+            <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.15" />
+        </filter>
+        <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#475569" />
+        </marker>
+        <marker id="arrowBlue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#2563eb" />
+        </marker>
+    </defs>
+    
+    <!-- Title -->
+    <rect x="20" y="15" width="960" height="40" rx="6" fill="#1e293b" />
+    <text x="500" y="41" fill="#ffffff" font-size="16" font-weight="bold" text-anchor="middle">Figure 4.2: Dual-Stream Vulnerability Ingestion &amp; Normalization Pipeline</text>
+
+    <!-- Left Box: NVD Pipeline -->
+    <rect x="30" y="75" width="455" height="545" rx="8" fill="url(#blueGrad)" stroke="#3b82f6" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="50" y="102" fill="#1e3a8a" font-size="14" font-weight="bold">STREAM 1: NIST NVD CVE INGESTION</text>
+
+    <!-- Steps for NVD -->
+    <g transform="translate(50, 120)">
+        <rect x="0" y="0" width="415" height="55" rx="6" fill="#ffffff" stroke="#93c5fd" />
+        <text x="15" y="24" fill="#1e3a8a" font-size="12" font-weight="bold">1. Ingestion Request Triggered</text>
+        <text x="15" y="42" fill="#64748b" font-size="10">Targeted CVE (e.g. CVE-2021-44228) or Range (startIndex, count)</text>
+
+        <path d="M 207 55 L 207 75" stroke="#2563eb" stroke-width="2" marker-end="url(#arrowBlue)" />
+
+        <rect x="0" y="75" width="415" height="55" rx="6" fill="#ffffff" stroke="#93c5fd" />
+        <text x="15" y="99" fill="#1e3a8a" font-size="12" font-weight="bold">2. Audit Run Record Created</text>
+        <text x="15" y="117" fill="#64748b" font-size="10">INSERT data_ingestion_runs with status='PENDING', feed='NVD'</text>
+
+        <path d="M 207 130 L 207 150" stroke="#2563eb" stroke-width="2" marker-end="url(#arrowBlue)" />
+
+        <rect x="0" y="150" width="415" height="55" rx="6" fill="#ffffff" stroke="#93c5fd" />
+        <text x="15" y="174" fill="#1e3a8a" font-size="12" font-weight="bold">3. Upstream HTTP GET (services.nvd.nist.gov)</text>
+        <text x="15" y="192" fill="#64748b" font-size="10">Asynchronous HTTPX client with exponential backoff on HTTP 403/429</text>
+
+        <path d="M 207 205 L 207 225" stroke="#2563eb" stroke-width="2" marker-end="url(#arrowBlue)" />
+
+        <rect x="0" y="225" width="415" height="65" rx="6" fill="#ffffff" stroke="#93c5fd" />
+        <text x="15" y="248" fill="#1e3a8a" font-size="12" font-weight="bold">4. Schema Parsing &amp; Normalization</text>
+        <text x="15" y="265" fill="#64748b" font-size="10">Extracts: CVSS v3.1 / v2.0 Base Score, Vector String, Description,</text>
+        <text x="15" y="279" fill="#64748b" font-size="10">Publication Date, and Last Modified Date</text>
+
+        <path d="M 207 290 L 207 310" stroke="#2563eb" stroke-width="2" marker-end="url(#arrowBlue)" />
+
+        <rect x="0" y="310" width="415" height="65" rx="6" fill="#ffffff" stroke="#93c5fd" />
+        <text x="15" y="333" fill="#1e3a8a" font-size="12" font-weight="bold">5. Idempotent Database Upsert</text>
+        <text x="15" y="350" fill="#64748b" font-size="10">Upserts into 'vulnerabilities' table. New CVEs increment inserted count;</text>
+        <text x="15" y="364" fill="#64748b" font-size="10">existing CVEs update metadata and increment updated count.</text>
+
+        <path d="M 207 375 L 207 395" stroke="#2563eb" stroke-width="2" marker-end="url(#arrowBlue)" />
+
+        <rect x="0" y="395" width="415" height="55" rx="6" fill="#ffffff" stroke="#93c5fd" />
+        <text x="15" y="418" fill="#047857" font-size="12" font-weight="bold">6. Ingestion Telemetry Committed</text>
+        <text x="15" y="436" fill="#64748b" font-size="10">UPDATE data_ingestion_runs: status='SUCCESS', records_fetched, etc.</text>
+    </g>
+
+    <!-- Right Box: CISA KEV Pipeline -->
+    <rect x="515" y="75" width="455" height="545" rx="8" fill="url(#roseGrad)" stroke="#f43f5e" stroke-width="1.5" filter="url(#shadow)" />
+    <text x="535" y="102" fill="#881337" font-size="14" font-weight="bold">STREAM 2: CISA KEV CATALOG INGESTION</text>
+
+    <!-- Steps for KEV -->
+    <g transform="translate(535, 120)">
+        <rect x="0" y="0" width="415" height="55" rx="6" fill="#ffffff" stroke="#fecdd3" />
+        <text x="15" y="24" fill="#881337" font-size="12" font-weight="bold">1. KEV Synchronization Triggered</text>
+        <text x="15" y="42" fill="#64748b" font-size="10">Invoked via POST /api/v1/exploitation-status/ingest/cisa-kev</text>
+
+        <path d="M 207 55 L 207 75" stroke="#e11d48" stroke-width="2" marker-end="url(#arrow)" />
+
+        <rect x="0" y="75" width="415" height="55" rx="6" fill="#ffffff" stroke="#fecdd3" />
+        <text x="15" y="99" fill="#881337" font-size="12" font-weight="bold">2. Audit Run Record Created</text>
+        <text x="15" y="117" fill="#64748b" font-size="10">INSERT data_ingestion_runs with status='PENDING', feed='CISA_KEV'</text>
+
+        <path d="M 207 130 L 207 150" stroke="#e11d48" stroke-width="2" marker-end="url(#arrow)" />
+
+        <rect x="0" y="150" width="415" height="55" rx="6" fill="#ffffff" stroke="#fecdd3" />
+        <text x="15" y="174" fill="#881337" font-size="12" font-weight="bold">3. Authoritative Feed Retrieval</text>
+        <text x="15" y="192" fill="#64748b" font-size="10">Downloads complete JSON catalog from cisa.gov (1,739+ active CVEs)</text>
+
+        <path d="M 207 205 L 207 225" stroke="#e11d48" stroke-width="2" marker-end="url(#arrow)" />
+
+        <rect x="0" y="225" width="415" height="65" rx="6" fill="#ffffff" stroke="#fecdd3" />
+        <text x="15" y="248" fill="#881337" font-size="12" font-weight="bold">4. Stream Validation &amp; Model Mapping</text>
+        <text x="15" y="265" fill="#64748b" font-size="10">Pydantic models validate: cveID, dateAdded, dueDate,</text>
+        <text x="15" y="279" fill="#64748b" font-size="10">knownRansomwareCampaignUse, and requiredAction</text>
+
+        <path d="M 207 290 L 207 310" stroke="#e11d48" stroke-width="2" marker-end="url(#arrow)" />
+
+        <rect x="0" y="310" width="415" height="65" rx="6" fill="#ffffff" stroke="#fecdd3" />
+        <text x="15" y="333" fill="#881337" font-size="12" font-weight="bold">5. Relational Exploitation Linking</text>
+        <text x="15" y="350" fill="#64748b" font-size="10">Upserts into 'exploitation_status' with kev_flag=True. Matches</text>
+        <text x="15" y="364" fill="#64748b" font-size="10">existing CVEs in 'vulnerabilities' table to enrich threat posture.</text>
+
+        <path d="M 207 375 L 207 395" stroke="#e11d48" stroke-width="2" marker-end="url(#arrow)" />
+
+        <rect x="0" y="395" width="415" height="55" rx="6" fill="#ffffff" stroke="#fecdd3" />
+        <text x="15" y="418" fill="#047857" font-size="12" font-weight="bold">6. Run Completion &amp; Count Verification</text>
+        <text x="15" y="436" fill="#64748b" font-size="10">Records conclusion timestamp and accurate counts in run history.</text>
+    </g>
+</svg>

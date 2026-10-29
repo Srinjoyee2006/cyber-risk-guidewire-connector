@@ -1,0 +1,53 @@
+flowchart TD
+    Start([Input: Organization Security Telemetry]) --> Telemetry
+    
+    subgraph Inputs["Enterprise Security Controls"]
+        Telemetry["MFA Enforced Pct (0 - 100%)<br/>RDP Exposed to Internet (True/False)<br/>Unpatched Critical CVEs > 30 Days (Count)<br/>EDR Agent Coverage Pct (0 - 100%)"]
+    end
+    
+    subgraph PenaltyCalc["Deterministic Penalty Formulations"]
+        Base["Base Operational Risk<br/>R_base = 5.0 points"]
+        
+        P_MFA["MFA Incompletion Penalty<br/>P_MFA = (100.0 - MFA_pct) * 0.30<br/>Max Penalty: +30.0 points"]
+        
+        P_RDP["Exposed RDP Gateway Penalty<br/>P_RDP = 25.0 if RDP_exposed else 0.0<br/>Max Penalty: +25.0 points"]
+        
+        P_CVE["Overdue Critical Vulnerabilities<br/>P_CVE = min(35.0, OverdueCount * 7.0)<br/>Max Penalty: +35.0 points"]
+        
+        P_EDR["EDR Coverage Incompletion<br/>P_EDR = (100.0 - EDR_pct) * 0.20<br/>Max Penalty: +20.0 points"]
+    end
+    
+    Telemetry --> Base
+    Telemetry --> P_MFA
+    Telemetry --> P_RDP
+    Telemetry --> P_CVE
+    Telemetry --> P_EDR
+    
+    Base --> SumScore["Raw Aggregation<br/>RawScore = R_base + P_MFA + P_RDP + P_CVE + P_EDR"]
+    P_MFA --> SumScore
+    P_RDP --> SumScore
+    P_CVE --> SumScore
+    P_EDR --> SumScore
+    
+    SumScore --> Clamping["Score Normalization<br/>FinalScore = min(100.0, max(0.0, RawScore))"]
+    
+    subgraph Classification["Actuarial Classification Tiers"]
+        Clamping --> TierBranch{FinalScore Range}
+        TierBranch -- "Score < 40.0" --> TierLow["LOW TIER<br/>Minimal Residual Risk"]
+        TierBranch -- "40.0 <= Score < 60.0" --> TierMed["MEDIUM TIER<br/>Moderate Security Exposure"]
+        TierBranch -- "60.0 <= Score < 80.0" --> TierHigh["HIGH TIER<br/>Severe Control Deficiencies"]
+        TierBranch -- "Score >= 80.0" --> TierCrit["CRITICAL TIER<br/>Extreme Threat Vulnerability"]
+    end
+    
+    subgraph PolicyAction["Guidewire Policy Actions"]
+        TierLow --> ActionNominal["NOMINAL<br/>Bind standard policy terms<br/>Standard baseline deductible"]
+        TierMed --> ActionMonitor["MONITOR<br/>Bind with mandatory 60-day review<br/>Telemetry re-assessment required"]
+        TierHigh --> ActionReview["REVIEW REQUIRED<br/>Refer to Senior Underwriter<br/>Remediation warranty mandatory"]
+        TierCrit --> ActionReview
+    end
+    
+    subgraph Scenarios["Empirical Scenario Validation"]
+        SC_A["Scenario A (Clean Enterprise)<br/>Score = 5.0 | LOW | NOMINAL"]
+        SC_B["Scenario B (Moderate Risk)<br/>Score = 31.0 | LOW | NOMINAL"]
+        SC_C["Scenario C (Severe Compromise)<br/>Score = 95.0 | CRITICAL | REVIEW_REQ"]
+    end

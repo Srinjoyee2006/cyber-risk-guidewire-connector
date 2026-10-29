@@ -1,0 +1,90 @@
+graph TB
+    subgraph PresentationTier["Presentation Tier (React 19 + TypeScript + Vite)"]
+        UI_Overview["Overview Dashboard<br/>(Metrics & Run Status)"]
+        UI_Explorer["Vulnerability Explorer<br/>(Search & Factor Breakdown)"]
+        UI_Config["Prioritization Config<br/>(Rules & Thresholds)"]
+        UI_Observed["Observed Vulnerabilities<br/>(Enterprise Findings)"]
+        UI_Underwriting["Underwriting Terminal<br/>(Risk & Policy Actions)"]
+        UI_Client["Centralized API Client<br/>(Axios / api.ts)"]
+        UI_Overview --> UI_Client
+        UI_Explorer --> UI_Client
+        UI_Config --> UI_Client
+        UI_Observed --> UI_Client
+        UI_Underwriting --> UI_Client
+    end
+
+    subgraph APITier["Application API Tier (FastAPI v0.115.6)"]
+        FastAPI_App["FastAPI Main Application<br/>(CORS, Middleware, DTO Validation)"]
+        EP_Vuln["/api/v1/vulnerabilities<br/>(List, Detail, NVD Ingest)"]
+        EP_KEV["/api/v1/exploitation-status<br/>(List, CISA Ingest)"]
+        EP_Prio["/api/v1/prioritizations<br/>(Prioritize, Factor Audit)"]
+        EP_Org["/api/v1/organizations<br/>(Tenant Management)"]
+        EP_Asset["/api/v1/assets<br/>(Inventory Management)"]
+        EP_Obs["/api/v1/vulnerability-observations<br/>(Scanner Ingest)"]
+        EP_UW["/api/v1/underwriting<br/>(Scenario Evaluation)"]
+        
+        FastAPI_App --> EP_Vuln
+        FastAPI_App --> EP_KEV
+        FastAPI_App --> EP_Prio
+        FastAPI_App --> EP_Org
+        FastAPI_App --> EP_Asset
+        FastAPI_App --> EP_Obs
+        FastAPI_App --> EP_UW
+    end
+
+    subgraph AnalyticsTier["Core Analytics & Processing Tier"]
+        Ingest_NVD["NVD Ingestion Service<br/>(Pagination & JSON Normalizer)"]
+        Ingest_KEV["CISA KEV Service<br/>(Stream Parser & Matcher)"]
+        Engine_Prio["Vulnerability Prioritization Engine<br/>(Base CVSS + KEV + Ransomware -> P1-P4)"]
+        Engine_Risk["Organization RiskEngine<br/>(MFA + RDP + CVEs + EDR -> Score 0-100)"]
+        Engine_Cov["Coverage & Deductible Engine<br/>(Underwriter Directives)"]
+    end
+
+    subgraph PersistenceTier["Data Persistence Tier (SQLAlchemy 2.0 / SQLite)"]
+        DB[(cyber_risk.db SQLite File)]
+        T_Runs["data_ingestion_runs"]
+        T_Vuln["vulnerabilities"]
+        T_KEV["exploitation_status"]
+        T_Prio["vulnerability_prioritizations"]
+        T_Org["organizations"]
+        T_Asset["assets"]
+        T_Obs["vulnerability_observations"]
+        
+        DB --- T_Runs
+        DB --- T_Vuln
+        DB --- T_KEV
+        DB --- T_Prio
+        DB --- T_Org
+        DB --- T_Asset
+        DB --- T_Obs
+    end
+
+    subgraph ExternalFeeds["External Threat Intelligence (Live HTTPS)"]
+        EXT_NVD["NIST NVD API 2.0<br/>(services.nvd.nist.gov)"]
+        EXT_KEV["CISA KEV Catalog<br/>(cisa.gov JSON Feed)"]
+    end
+
+    subgraph CoreIntegration["Guidewire Integration (Simulated / Mock Mode)"]
+        GW_Mock["Guidewire Service Adapter<br/>(GW_MOCK_MODE = True)"]
+        GW_Notes["PolicyCenter Underwriting Notes<br/>& Account File Activities (Mocked)"]
+        GW_Mock --> GW_Notes
+    end
+
+    UI_Client ==>|JSON over HTTP| FastAPI_App
+    EP_Vuln --> Ingest_NVD
+    EP_KEV --> Ingest_KEV
+    EP_Prio --> Engine_Prio
+    EP_UW --> Engine_Risk
+    Engine_Risk --> Engine_Cov
+    Engine_Cov --> GW_Mock
+    
+    Ingest_NVD <==|HTTPS REST| EXT_NVD
+    Ingest_KEV <==|HTTPS Feed| EXT_KEV
+
+    Ingest_NVD --> T_Runs
+    Ingest_NVD --> T_Vuln
+    Ingest_KEV --> T_KEV
+    Engine_Prio --> T_Prio
+    EP_Org --> T_Org
+    EP_Asset --> T_Asset
+    EP_Obs --> T_Obs

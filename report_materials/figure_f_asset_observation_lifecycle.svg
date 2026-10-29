@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 680" width="100%" height="100%" style="background:#ffffff; font-family:'Segoe UI', Inter, Arial, sans-serif;">
+    
+    <defs>
+        <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#eff6ff" />
+            <stop offset="100%" stop-color="#dbeafe" />
+        </linearGradient>
+        <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#faf5ff" />
+            <stop offset="100%" stop-color="#f3e8ff" />
+        </linearGradient>
+        <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#fffbeb" />
+            <stop offset="100%" stop-color="#fef3c7" />
+        </linearGradient>
+        <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ecfdf5" />
+            <stop offset="100%" stop-color="#d1fae5" />
+        </linearGradient>
+        <linearGradient id="roseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#fff1f2" />
+            <stop offset="100%" stop-color="#ffe4e6" />
+        </linearGradient>
+        <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%" filterUnits="userSpaceOnUse">
+            <feDropShadow dx="2" dy="2" stdDeviation="3" flood-opacity="0.15" />
+        </filter>
+        <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#475569" />
+        </marker>
+        <marker id="arrowBlue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#2563eb" />
+        </marker>
+    </defs>
+    
+    <!-- Title -->
+    <rect x="20" y="15" width="960" height="40" rx="6" fill="#1e293b" />
+    <text x="500" y="41" fill="#ffffff" font-size="16" font-weight="bold" text-anchor="middle">Figure 4.6: Enterprise Asset Governance &amp; Vulnerability Observation Lifecycle</text>
+
+    <!-- Phase 1: Org Onboarding -->
+    <g transform="translate(50, 75)">
+        <rect x="0" y="0" width="900" height="80" rx="6" fill="url(#emeraldGrad)" stroke="#10b981" stroke-width="1.5" filter="url(#shadow)" />
+        <text x="20" y="25" fill="#065f46" font-size="13" font-weight="bold">PHASE 1: ORGANIZATION ONBOARDING &amp; LEGAL DATA CONSENT</text>
+        <rect x="20" y="35" width="380" height="32" rx="4" fill="#ffffff" stroke="#a7f3d0" />
+        <text x="30" y="55" fill="#1e293b" font-size="11">POST /api/v1/organizations (organization_ref, display_name)</text>
+        <rect x="420" y="35" width="450" height="32" rx="4" fill="#ffffff" stroke="#a7f3d0" />
+        <text x="430" y="55" fill="#047857" font-size="11" font-weight="bold">Verification Gate: data_authorization_flag == True (Legal Authorization)</text>
+    </g>
+
+    <path d="M 500 155 L 500 185" stroke="#059669" stroke-width="2" marker-end="url(#arrow)" />
+
+    <!-- Phase 2: Asset Inventory -->
+    <g transform="translate(50, 185)">
+        <rect x="0" y="0" width="900" height="80" rx="6" fill="url(#blueGrad)" stroke="#3b82f6" stroke-width="1.5" filter="url(#shadow)" />
+        <text x="20" y="25" fill="#1e3a8a" font-size="13" font-weight="bold">PHASE 2: ENTERPRISE ASSET INVENTORY REGISTRATION</text>
+        <rect x="20" y="35" width="420" height="32" rx="4" fill="#ffffff" stroke="#93c5fd" />
+        <text x="30" y="55" fill="#1e293b" font-size="11">Register Infrastructure: Hostnames, IP Addresses, Asset Types</text>
+        <rect x="460" y="35" width="410" height="32" rx="4" fill="#ffffff" stroke="#93c5fd" />
+        <text x="470" y="55" fill="#1e3a8a" font-size="11" font-weight="bold">Assign Criticality Tier: LOW, MEDIUM, HIGH, CRITICAL</text>
+    </g>
+
+    <path d="M 500 265 L 500 295" stroke="#2563eb" stroke-width="2" marker-end="url(#arrowBlue)" />
+
+    <!-- Phase 3: Scanner Ingestion -->
+    <g transform="translate(50, 295)">
+        <rect x="0" y="0" width="900" height="85" rx="6" fill="url(#purpleGrad)" stroke="#8b5cf6" stroke-width="1.5" filter="url(#shadow)" />
+        <text x="20" y="25" fill="#581c87" font-size="13" font-weight="bold">PHASE 3: SCANNER FINDING INGESTION (QUALYS / TENABLE / NESSUS)</text>
+        <rect x="20" y="35" width="420" height="38" rx="4" fill="#ffffff" stroke="#c4b5fd" />
+        <text x="30" y="53" fill="#1e293b" font-size="10">Validate Asset Association: asset_ref mapped to parent org</text>
+        <text x="30" y="66" fill="#64748b" font-size="9">Rejects orphan findings to maintain data isolation</text>
+        <rect x="460" y="35" width="410" height="38" rx="4" fill="#ffffff" stroke="#c4b5fd" />
+        <text x="470" y="53" fill="#581c87" font-size="10" font-weight="bold">Extract Finding Attributes: CVE ID, scanner_source, observed_at</text>
+        <text x="470" y="66" fill="#64748b" font-size="9">Preserves raw scanner payload in raw_evidence JSON column</text>
+    </g>
+
+    <path d="M 500 380 L 500 410" stroke="#7c3aed" stroke-width="2" marker-end="url(#arrow)" />
+
+    <!-- Phase 4: Threat Intelligence Enrichment -->
+    <g transform="translate(50, 410)">
+        <rect x="0" y="0" width="900" height="85" rx="6" fill="url(#amberGrad)" stroke="#f59e0b" stroke-width="1.5" filter="url(#shadow)" />
+        <text x="20" y="25" fill="#78350f" font-size="13" font-weight="bold">PHASE 4: RELATIONAL THREAT INTELLIGENCE JOINING</text>
+        <rect x="20" y="35" width="420" height="38" rx="4" fill="#ffffff" stroke="#fcd34d" />
+        <text x="30" y="53" fill="#1e293b" font-size="10">Join 'vulnerabilities' table: Attach CVSS v3.1 metrics &amp; vectors</text>
+        <text x="30" y="66" fill="#64748b" font-size="9">Enriches finding with authoritative NIST descriptions</text>
+        <rect x="460" y="35" width="410" height="38" rx="4" fill="#ffffff" stroke="#fcd34d" />
+        <text x="470" y="53" fill="#b45309" font-size="10" font-weight="bold">Join 'exploitation_status' table: Attach CISA KEV flag &amp; ransomware</text>
+        <text x="470" y="66" fill="#64748b" font-size="9">Flags whether observation represents an actively weaponized exploit</text>
+    </g>
+
+    <path d="M 500 495 L 500 525" stroke="#b45309" stroke-width="2" marker-end="url(#arrow)" />
+
+    <!-- Phase 5: Triage & Underwriting Integration -->
+    <g transform="translate(50, 525)">
+        <rect x="0" y="0" width="900" height="120" rx="6" fill="#f8fafc" stroke="#64748b" stroke-width="1.5" filter="url(#shadow)" />
+        <text x="20" y="25" fill="#0f172a" font-size="13" font-weight="bold">PHASE 5: FINDING TRIAGE &amp; UNDERWRITING RISK EVALUATION</text>
+        
+        <rect x="20" y="38" width="260" height="65" rx="4" fill="#ffffff" stroke="#cbd5e1" />
+        <text x="150" y="58" fill="#1e293b" font-size="11" font-weight="bold" text-anchor="middle">Status: VERIFIED</text>
+        <text x="150" y="74" fill="#64748b" font-size="10" text-anchor="middle">Scanner confirmed vulnerable asset</text>
+        <text x="150" y="90" fill="#dc2626" font-size="9" font-weight="bold" text-anchor="middle">Feeds into RiskEngine Penalty</text>
+
+        <rect x="310" y="38" width="260" height="65" rx="4" fill="#ffffff" stroke="#cbd5e1" />
+        <text x="440" y="58" fill="#1e293b" font-size="11" font-weight="bold" text-anchor="middle">Status: UNVERIFIED / FALSE +</text>
+        <text x="440" y="74" fill="#64748b" font-size="10" text-anchor="middle">Awaiting manual security review</text>
+        <text x="440" y="90" fill="#d97706" font-size="9" font-weight="bold" text-anchor="middle">Excluded from Underwriting Penalty</text>
+
+        <rect x="600" y="38" width="280" height="65" rx="4" fill="#ffffff" stroke="#cbd5e1" />
+        <text x="740" y="58" fill="#1e293b" font-size="11" font-weight="bold" text-anchor="middle">Status: REMEDIATED</text>
+        <text x="740" y="74" fill="#64748b" font-size="10" text-anchor="middle">Patch applied &amp; re-scan confirmed</text>
+        <text x="740" y="90" fill="#059669" font-size="9" font-weight="bold" text-anchor="middle">Reduces Overdue CVE Penalty to 0</text>
+    </g>
+</svg>
