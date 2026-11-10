@@ -488,7 +488,7 @@ export type CoverageStatus =
   | 'NOT_DOCUMENTED'
   | 'REVIEW_REQUIRED'
 
-export type WordingClarity = 'EXPLICIT' | 'AMBIGUOUS' | 'INCOMPLETE'
+export type WordingClarity = 'EXPLICIT' | 'AMBIGUOUS' | 'INCOMPLETE' | 'CONFLICTING'
 
 export type PolicyStatus = 'ACTIVE' | 'EXPIRED' | 'PENDING' | 'CANCELLED'
 

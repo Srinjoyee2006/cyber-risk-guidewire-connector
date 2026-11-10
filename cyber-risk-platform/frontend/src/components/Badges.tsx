@@ -211,6 +211,8 @@ export const WordingClarityBadge: React.FC<{ clarity: string }> = ({ clarity }) 
     color = 'bg-amber-950/60 text-amber-300 border-amber-800/50'
   } else if (c === 'INCOMPLETE') {
     color = 'bg-rose-950/60 text-rose-300 border-rose-800/50'
+  } else if (c === 'CONFLICTING') {
+    color = 'bg-purple-950/60 text-purple-300 border-purple-800/50'
   }
 
   return (

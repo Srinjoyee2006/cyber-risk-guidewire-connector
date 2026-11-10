@@ -4,6 +4,7 @@ Coverage Engine - Evaluates Policy Terms, Sublimits, Deductibles, Coverage Gaps 
 """
 
 from datetime import datetime, timezone, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Optional
 import uuid
 
@@ -117,7 +118,7 @@ class CoverageEngine:
                 recommended_endorsement_code=None,
                 underwriter_notes=(
                     f"Policy {policy_number} risk score is {risk_score:.1f} ({risk_tier.value} tier). "
-                    f"Security controls satisfy actuarial standards. Maintain standard in-force coverage: "
+                    f"Security controls satisfy underwriting standards. Maintain standard in-force coverage: "
                     f"Aggregate Limit: ${current_aggregate_limit:,.0f}, "
                     f"Ransomware Sublimit: ${current_ransomware_sublimit:,.0f}, "
                     f"Retention: ${current_retention:,.0f}. "
@@ -195,7 +196,7 @@ class CoverageEngine:
                     f"Primary risk drivers: {triggers_str}. "
                     f"Financial Gap Analysis: Projected breach severity is ${event_loss:,.0f}, creating an "
                     f"immediate ${coverage_gap:,.0f} uninsured coverage gap above the in-force ${current_ransomware_sublimit:,.0f} sublimit! "
-                    f"Actuarial recommendations: "
+                    f"Underwriting recommendations (Simplified deterministic hypothetical loss calculation): "
                     f"1) Restrict Ransomware/Extortion Sublimit by {abs(sublimit_cut):.0f}% from "
                     f"${current_ransomware_sublimit:,.0f} down to ${new_sublimit:,.0f}; "
                     f"2) Endorse {retention_multiplier:.1f}x Retention Surcharge increasing deductible "
@@ -292,6 +293,31 @@ class CoverageEngine:
         has_mfa_deficit = mfa_penalty and mfa_penalty.penalty_points > 0
         backups_unverified = telemetry_summary.get("immutable_backups_verified") is False
 
+        # General policy exclusions cannot be silently ignored
+        general_exclusions = [str(e).upper() for e in (policy.exclusions or [])]
+        has_vuln_exclusion = any(
+            "UNPATCHED" in e or "VULNERABILITY" in e or "KNOWN_EXPLOIT" in e for e in general_exclusions
+        )
+        if has_vuln_exclusion and has_critical_cves:
+            gaps.append(
+                CoverageGapFinding(
+                    gap_id=f"GAP-GEN-EXCL-VULN-{uuid.uuid4().hex[:4].upper()}",
+                    organization_ref=policy.organization_ref,
+                    policy_number=policy.policy_number,
+                    coverage_category=CoverageCategoryEnum.RANSOMWARE_EXTORTION,
+                    severity="CRITICAL",
+                    gap_title="General Policy Exclusion Triggered: Unpatched Known Vulnerabilities",
+                    explanation=(
+                        "Policy contains a general exclusion for losses resulting from unpatched known vulnerabilities. "
+                        f"Active critical vulnerabilities aged past SLA ({cve_penalty.observed_value if cve_penalty else ''}) "
+                        "trigger this general exclusion, putting claims at risk of outright forfeiture."
+                    ),
+                    supporting_policy_term="General Policy Exclusion: Unpatched Known Vulnerabilities Endorsement",
+                    supporting_risk_evidence=f"Active Critical Vulnerabilities: {cve_penalty.observed_value if cve_penalty else 'Present'}",
+                    recommended_review_action="Remediate all aging critical vulnerabilities immediately to restore affirmative coverage rights.",
+                )
+            )
+
         # Evaluate all 8 structured coverage categories
         for cat in CoverageCategoryEnum:
             cat_str = cat.value
@@ -343,19 +369,20 @@ class CoverageEngine:
                 waiting_h = sec.waiting_period_hours if sec.waiting_period_hours is not None else policy.waiting_period_hours
                 coins = sec.coinsurance_pct if sec.coinsurance_pct is not None else policy.coinsurance_pct
 
-                # Check wording ambiguity
-                if wording in (WordingClarityEnum.AMBIGUOUS, WordingClarityEnum.INCOMPLETE) and raw_status != CoverageStatusEnum.EXCLUDED.value:
+                # Check wording ambiguity & conflicting clauses
+                if wording in (WordingClarityEnum.AMBIGUOUS, WordingClarityEnum.INCOMPLETE, WordingClarityEnum.CONFLICTING) and raw_status != CoverageStatusEnum.EXCLUDED.value:
                     status = CoverageStatusEnum.REVIEW_REQUIRED
+                    gap_title = f"Conflicting Terms in {cat_meta['title']}" if wording == WordingClarityEnum.CONFLICTING else f"Ambiguous Policy Wording in {cat_meta['title']}"
                     gap = CoverageGapFinding(
-                        gap_id=f"GAP-AMBIG-{cat_str[:8]}-{uuid.uuid4().hex[:4].upper()}",
+                        gap_id=f"GAP-CLARITY-{cat_str[:8]}-{uuid.uuid4().hex[:4].upper()}",
                         organization_ref=policy.organization_ref,
                         policy_number=policy.policy_number,
                         coverage_category=cat,
                         severity="HIGH",
-                        gap_title=f"Ambiguous Policy Wording in {cat_meta['title']}",
+                        gap_title=gap_title,
                         explanation=f"Contractual wording for {cat_meta['title']} is marked as {wording.value}. Potential coverage dispute risk during claims adjudication.",
                         supporting_policy_term=f"Section: {sec.coverage_name} (Clarity: {wording.value}). Notes: {sec.section_notes or 'None'}",
-                        supporting_risk_evidence="Ambiguous phrasing prevents definitive claim settlement estimation.",
+                        supporting_risk_evidence="Ambiguous or conflicting phrasing prevents definitive claim settlement estimation.",
                         recommended_review_action="Obtain clarifying underwriter endorsement or standard contract definition rider.",
                     )
                     gaps.append(gap)
@@ -388,6 +415,12 @@ class CoverageEngine:
                 else:
                     status = CoverageStatusEnum.COVERED
                     notes = "Affirmative contractual coverage documented."
+
+                # Check if general policy exclusion applies
+                if has_vuln_exclusion and has_critical_cves and cat in (CoverageCategoryEnum.RANSOMWARE_EXTORTION, CoverageCategoryEnum.BUSINESS_INTERRUPTION):
+                    if status == CoverageStatusEnum.COVERED:
+                        status = CoverageStatusEnum.REVIEW_REQUIRED
+                        notes = "General exclusion for unpatched known vulnerabilities applies due to active critical CVEs."
 
                 # Category-specific gap evaluations
                 if cat == CoverageCategoryEnum.RANSOMWARE_EXTORTION and status != CoverageStatusEnum.EXCLUDED:
@@ -566,8 +599,205 @@ class CoverageEngine:
         return category_evaluations, gaps, hypothetical_scenarios, summary
 
     # =========================================================================
-    # Hypothetical Loss Scenario Modeling
+    # Hypothetical Loss Scenario Modeling (Exact Decimal Mathematics)
     # =========================================================================
+
+    @staticmethod
+    def calculate_hypothetical_loss_distribution(
+        gross_loss: float | Decimal,
+        deductible: float | Decimal,
+        coinsurance_pct: float | Decimal,
+        sublimit: Optional[float | Decimal],
+        overall_limit: float | Decimal,
+        coverage_status: CoverageStatusEnum,
+        outage_duration_hours: Optional[float] = None,
+        waiting_period_hours: Optional[int] = None,
+        wording_clarity: Optional[WordingClarityEnum] = None,
+    ) -> tuple[Optional[float], float, float, str, list[str]]:
+        """
+        Simplified deterministic hypothetical loss calculation.
+        Converts all inputs to Decimal to guarantee exact currency precision.
+        Guarantees exact conservation invariant:
+        Gross Loss == (Carrier-Payable Amount or 0.0) + Insured Retention + Uncovered Gap
+        """
+        d_zero = Decimal("0.00")
+        d_gross = Decimal(str(max(0.0, float(gross_loss)))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        d_ded = Decimal(str(max(0.0, float(deductible)))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        d_coins_pct = Decimal(str(max(0.0, min(100.0, float(coinsurance_pct))))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        d_overall = Decimal(str(max(0.0, float(overall_limit)))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        if sublimit is not None and float(sublimit) >= 0.0:
+            d_limit = min(Decimal(str(float(sublimit))), d_overall).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        else:
+            d_limit = d_overall
+
+        assumptions: list[str] = [
+            "Simplified deterministic hypothetical loss calculation based on standardized policy terms.",
+            "Does not constitute claim adjudication, settlement promise, or legal interpretation.",
+            "All monetary calculations performed using exact decimal currency arithmetic.",
+        ]
+
+        # 1. Zero Loss Case
+        if d_gross == d_zero:
+            return 0.0, 0.0, 0.0, (
+                "Simplified deterministic hypothetical loss calculation: Gross loss is $0.00. "
+                "No claim attaches; carrier payable, insured retention, and uncovered gap are all $0.00."
+            ), assumptions
+
+        # 2. Excluded or Not Documented Cases
+        if coverage_status in (CoverageStatusEnum.EXCLUDED, CoverageStatusEnum.NOT_DOCUMENTED):
+            uncovered_gap = float(d_gross)
+            explanation = (
+                f"Simplified deterministic hypothetical loss calculation: Underwriting status is {coverage_status.value}. "
+                f"Carrier-payable amount is $0.00. The entire ${uncovered_gap:,.2f} loss is retained as an uninsured gap by the insured organization."
+            )
+            return 0.0, 0.0, uncovered_gap, explanation, assumptions
+
+        # 3. Review Required / Ambiguous / Conflicting Wording Cases
+        if coverage_status == CoverageStatusEnum.REVIEW_REQUIRED or wording_clarity in (WordingClarityEnum.AMBIGUOUS, WordingClarityEnum.CONFLICTING):
+            insured_retention = float(min(d_gross, d_ded))
+            uncovered_gap = float(d_gross - min(d_gross, d_ded))
+            explanation = (
+                f"Simplified deterministic hypothetical loss calculation: Coverage status is REVIEW_REQUIRED "
+                f"(wording clarity: {wording_clarity.value if wording_clarity else 'REVIEW_REQUIRED'}). "
+                f"A definitive carrier-payable amount cannot be certified without human underwriting and claims review. "
+                f"Gross loss is ${float(d_gross):,.2f}; potential policy retention is ${insured_retention:,.2f}."
+            )
+            assumptions.append("Carrier-payable amount is undetermined pending underwriting determination.")
+            return None, insured_retention, uncovered_gap, explanation, assumptions
+
+        # 4. Waiting Period Handling (Business Interruption)
+        d_waiting_retention = d_zero
+        d_eligible_gross = d_gross
+        if waiting_period_hours is not None and waiting_period_hours > 0 and outage_duration_hours is not None and outage_duration_hours > 0:
+            if outage_duration_hours <= waiting_period_hours:
+                # Outage did not exceed waiting period -> No indemnity attaches
+                uncovered_gap = float(d_gross)
+                explanation = (
+                    f"Simplified deterministic hypothetical loss calculation: Outage duration ({outage_duration_hours:.1f}h) "
+                    f"did not exceed the mandatory waiting period ({waiting_period_hours}h). "
+                    f"Business interruption coverage does not attach. 100% of the loss (${uncovered_gap:,.2f}) is an uncovered gap."
+                )
+                assumptions.append(f"Waiting period qualifying threshold: {waiting_period_hours} hours.")
+                return 0.0, 0.0, uncovered_gap, explanation, assumptions
+            else:
+                # Outage exceeds waiting period: Time-deductible elimination period
+                # Simplified deterministic model assuming uniform hourly loss
+                d_outage_h = Decimal(str(outage_duration_hours))
+                d_wait_h = Decimal(str(waiting_period_hours))
+                d_waiting_retention = (d_gross * (d_wait_h / d_outage_h)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                d_eligible_gross = d_gross - d_waiting_retention
+                assumptions.append(
+                    f"Waiting period ({waiting_period_hours}h of {outage_duration_hours:.1f}h outage) treated as elimination period: "
+                    f"${float(d_waiting_retention):,.2f} retained by insured."
+                )
+
+        # 5. Deductible Application on Eligible Loss
+        if d_eligible_gross <= d_ded:
+            d_monetary_retention = d_eligible_gross
+            d_carrier_payout = d_zero
+            d_uncovered_gap = d_zero
+        else:
+            d_net = d_eligible_gross - d_ded
+            d_coins_amt = (d_net * (d_coins_pct / Decimal("100"))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            d_carrier_share = d_net - d_coins_amt
+            d_carrier_payout = min(d_limit, d_carrier_share)
+            d_monetary_retention = d_ded + d_coins_amt
+            d_uncovered_gap = d_eligible_gross - d_carrier_payout - d_monetary_retention
+
+        d_total_retention = d_waiting_retention + d_monetary_retention
+        d_final_gap = d_gross - d_carrier_payout - d_total_retention
+
+        carrier_payout_val = float(d_carrier_payout)
+        insured_retention_val = float(d_total_retention)
+        uncovered_gap_val = float(d_final_gap)
+
+        explanation = (
+            f"Simplified deterministic hypothetical loss calculation: "
+            f"Gross Loss (${float(d_gross):,.2f})"
+        )
+        if d_waiting_retention > d_zero:
+            explanation += f" - Waiting Period Retention (${float(d_waiting_retention):,.2f}) = Eligible Loss (${float(d_eligible_gross):,.2f})"
+        explanation += (
+            f" - Deductible (${float(d_ded):,.2f})"
+            f" -> Coinsurance ({float(d_coins_pct):.0f}%)"
+            f" -> Sublimit Cap (${float(d_limit):,.2f})"
+            f" = Carrier Payout (${carrier_payout_val:,.2f}), "
+            f"Insured Retention (${insured_retention_val:,.2f}), "
+            f"Uncovered Gap (${uncovered_gap_val:,.2f})."
+        )
+
+        return carrier_payout_val, insured_retention_val, uncovered_gap_val, explanation, assumptions
+
+    def _calculate_single_scenario(
+        self,
+        scenario_id: str,
+        name: str,
+        desc: str,
+        category: CoverageCategoryEnum,
+        gross_loss: float,
+        policy: InsurancePolicyModel,
+        section: Optional[PolicyCoverageSectionModel] = None,
+        outage_duration_hours: Optional[float] = None,
+    ) -> HypotheticalLossScenario:
+        """Helper to compute a single HypotheticalLossScenario with exact decimal mathematics."""
+        status = CoverageStatusEnum(section.status) if section and section.status else CoverageStatusEnum.COVERED
+        clarity = (
+            WordingClarityEnum(section.wording_clarity)
+            if section and section.wording_clarity in WordingClarityEnum._value2member_map_
+            else WordingClarityEnum.EXPLICIT
+        )
+        deductible = (
+            section.deductible_amount
+            if section and section.deductible_amount is not None
+            else policy.retention_deductible
+        )
+        coins = (
+            section.coinsurance_pct
+            if section and section.coinsurance_pct is not None
+            else policy.coinsurance_pct
+        )
+        limit = (
+            section.limit_amount
+            if section and section.limit_amount is not None
+            else policy.overall_limit
+        )
+        wait_h = (
+            section.waiting_period_hours
+            if section and section.waiting_period_hours is not None
+            else policy.waiting_period_hours
+        )
+
+        carrier_payout, retention, gap, explanation, assumptions = self.calculate_hypothetical_loss_distribution(
+            gross_loss=gross_loss,
+            deductible=deductible,
+            coinsurance_pct=coins,
+            sublimit=limit,
+            overall_limit=policy.overall_limit,
+            coverage_status=status,
+            outage_duration_hours=outage_duration_hours,
+            waiting_period_hours=wait_h,
+            wording_clarity=clarity,
+        )
+
+        return HypotheticalLossScenario(
+            scenario_id=scenario_id,
+            scenario_name=name,
+            description=desc,
+            coverage_category=category,
+            estimated_gross_loss=gross_loss,
+            currency=policy.currency,
+            coverage_status=status,
+            applicable_limit=limit,
+            applicable_deductible=deductible,
+            applicable_coinsurance_pct=coins,
+            waiting_period_impact=f"{wait_h}h waiting period" if wait_h else None,
+            estimated_covered_amount=carrier_payout,
+            estimated_insured_retention=retention,
+            estimated_uncovered_gap=gap,
+            calculation_explanation=explanation,
+            assumptions_and_limitations=assumptions,
+        )
 
     def build_hypothetical_loss_scenarios(
         self,
@@ -577,11 +807,14 @@ class CoverageEngine:
         """
         Calculates illustrative covered amounts vs uninsured gaps across 5 standardized hypothetical loss models.
         Adheres to deterministic calculation order:
-        Gross Loss -> Deductible -> Coinsurance -> Sublimit Cap -> Covered Amount vs Uncovered Gap.
+        Gross Loss -> Waiting Period Retention (if BI) -> Deductible -> Coinsurance -> Sublimit Cap -> Covered Amount vs Uncovered Gap.
+        All calculations use exact Decimal arithmetic and guarantee:
+        Gross Loss == (Carrier Payout or 0.0) + Insured Retention + Uncovered Gap.
         """
+        sections_by_cat = {s.category: s for s in policy.sections}
         if category_evaluations is None:
             category_evaluations, _, _, _ = self.evaluate_policy_coverage(policy=policy)
-        cat_map = {c.category: c for c in category_evaluations}
+        cat_eval_map = {c.category: c for c in category_evaluations}
 
         scenarios_definitions = [
             {
@@ -590,6 +823,7 @@ class CoverageEngine:
                 "description": "Sophisticated ransomware deployment exfiltrating sensitive intellectual property with demand for extortion payment.",
                 "category": CoverageCategoryEnum.RANSOMWARE_EXTORTION,
                 "gross_loss": 2_500_000.0,
+                "outage_hours": None,
             },
             {
                 "id": "HYPO-BREACH-02",
@@ -597,6 +831,7 @@ class CoverageEngine:
                 "description": "Unauthorized exfiltration of 150,000 corporate identity records requiring mandatory regulatory notice and defense.",
                 "category": CoverageCategoryEnum.DATA_BREACH_PRIVACY,
                 "gross_loss": 1_800_000.0,
+                "outage_hours": None,
             },
             {
                 "id": "HYPO-BI-03",
@@ -604,6 +839,7 @@ class CoverageEngine:
                 "description": "72-hour cascading operational downtime resulting from unpatched critical edge server compromise.",
                 "category": CoverageCategoryEnum.BUSINESS_INTERRUPTION,
                 "gross_loss": 1_200_000.0,
+                "outage_hours": 72.0,
             },
             {
                 "id": "HYPO-RESTORE-04",
@@ -611,6 +847,7 @@ class CoverageEngine:
                 "description": "Wiper attack destroying core transactional databases requiring specialized digital forensics reconstruction.",
                 "category": CoverageCategoryEnum.DATA_RESTORATION,
                 "gross_loss": 750_000.0,
+                "outage_hours": None,
             },
             {
                 "id": "HYPO-FRAUD-05",
@@ -618,104 +855,62 @@ class CoverageEngine:
                 "description": "Social engineering compromise of executive email leading to fraudulent diversion of vendor payment funds.",
                 "category": CoverageCategoryEnum.CYBER_CRIME,
                 "gross_loss": 500_000.0,
+                "outage_hours": None,
             },
         ]
 
         scenarios: list[HypotheticalLossScenario] = []
-
         for s_def in scenarios_definitions:
             cat = s_def["category"]
-            gross_loss = s_def["gross_loss"]
-            eval_detail = cat_map.get(cat)
+            eval_detail = cat_eval_map.get(cat)
+            sec = sections_by_cat.get(cat.value)
 
-            coverage_status = eval_detail.status if eval_detail else CoverageStatusEnum.NOT_DOCUMENTED
-            applicable_deductible = (eval_detail.deductible_amount if eval_detail and eval_detail.deductible_amount is not None else policy.retention_deductible)
-            applicable_coins_pct = (eval_detail.coinsurance_pct if eval_detail and eval_detail.coinsurance_pct is not None else policy.coinsurance_pct)
-            applicable_limit = (eval_detail.limit_amount if eval_detail and eval_detail.limit_amount is not None else policy.overall_limit)
-            waiting_impact = f"{eval_detail.waiting_period_hours}h waiting period applies" if eval_detail and eval_detail.waiting_period_hours else None
-
-            # Calculation logic according to coverage status
-            if coverage_status in (CoverageStatusEnum.EXCLUDED, CoverageStatusEnum.NOT_DOCUMENTED):
-                # No coverage available
-                estimated_covered = 0.0
-                insured_retention = 0.0
-                uncovered_gap = gross_loss
-                explanation = (
-                    f"Underwriting status is {coverage_status.value}. Insurer payout is $0.00. "
-                    f"The entire ${gross_loss:,.2f} loss is retained as an uninsured gap by the insured organization."
+            # Override section status/clarity from evaluation detail if evaluated
+            if eval_detail and sec:
+                sec_copy = PolicyCoverageSectionModel(
+                    section_id=sec.section_id,
+                    policy_id=sec.policy_id,
+                    category=sec.category,
+                    coverage_name=sec.coverage_name,
+                    status=eval_detail.status.value,
+                    limit_amount=eval_detail.limit_amount,
+                    is_sublimit=eval_detail.is_sublimit,
+                    deductible_amount=eval_detail.deductible_amount,
+                    waiting_period_hours=eval_detail.waiting_period_hours,
+                    coinsurance_pct=eval_detail.coinsurance_pct,
+                    wording_clarity=eval_detail.wording_clarity.value,
+                    applicable_exclusions=sec.applicable_exclusions,
+                    section_notes=sec.section_notes,
                 )
-            elif coverage_status == CoverageStatusEnum.REVIEW_REQUIRED:
-                # Ambiguous wording prevents definitive insurer payout calculation
-                estimated_covered = None
-                insured_retention = applicable_deductible
-                uncovered_gap = gross_loss
-                explanation = (
-                    f"Coverage status is REVIEW_REQUIRED due to ambiguous or incomplete contractual wording. "
-                    f"A definitive insurer payout cannot be certified. Underwriter and claims counsel review required. "
-                    f"Potential exposure is ${gross_loss:,.2f}."
+            elif eval_detail and not sec:
+                sec_copy = PolicyCoverageSectionModel(
+                    section_id=uuid.uuid4(),
+                    policy_id=policy.policy_id,
+                    category=cat.value,
+                    coverage_name=eval_detail.category_title,
+                    status=eval_detail.status.value,
+                    limit_amount=eval_detail.limit_amount,
+                    is_sublimit=eval_detail.is_sublimit,
+                    deductible_amount=eval_detail.deductible_amount,
+                    waiting_period_hours=eval_detail.waiting_period_hours,
+                    coinsurance_pct=eval_detail.coinsurance_pct,
+                    wording_clarity=eval_detail.wording_clarity.value,
+                    applicable_exclusions=[],
+                    section_notes=eval_detail.evaluation_notes,
                 )
             else:
-                # Deterministic calculation order:
-                # 1. Deductible application
-                if gross_loss <= applicable_deductible:
-                    estimated_covered = 0.0
-                    insured_retention = gross_loss
-                    uncovered_gap = 0.0
-                    explanation = (
-                        f"Gross loss (${gross_loss:,.2f}) is fully within the policy retention deductible (${applicable_deductible:,.2f}). "
-                        f"Insured retains 100% of the loss out-of-pocket; insurer payout is $0.00."
-                    )
-                else:
-                    net_loss = gross_loss - applicable_deductible
+                sec_copy = sec
 
-                    # 2. Coinsurance application
-                    if applicable_coins_pct > 0:
-                        insured_coins_amount = round(net_loss * (applicable_coins_pct / 100.0), 2)
-                        carrier_share = net_loss - insured_coins_amount
-                    else:
-                        insured_coins_amount = 0.0
-                        carrier_share = net_loss
-
-                    # 3. Sublimit / Limit application
-                    effective_limit = applicable_limit or policy.overall_limit
-                    carrier_payout = min(effective_limit, carrier_share)
-                    estimated_covered = carrier_payout
-
-                    # 4. Total insured retention & Uncovered gap
-                    insured_retention = round(applicable_deductible + insured_coins_amount, 2)
-                    uncovered_gap = max(0.0, round(gross_loss - carrier_payout - insured_retention, 2))
-
-                    explanation = (
-                        f"Calculation Order: "
-                        f"1) Gross Loss (${gross_loss:,.2f}) - Deductible (${applicable_deductible:,.2f}) = Net Loss (${net_loss:,.2f}). "
-                        f"2) Coinsurance ({applicable_coins_pct:.0f}%): Insured pays ${insured_coins_amount:,.2f}, Carrier share = ${carrier_share:,.2f}. "
-                        f"3) Limit Cap (${effective_limit:,.2f}): Carrier payout is ${carrier_payout:,.2f}. "
-                        f"4) Total Insured Retention is ${insured_retention:,.2f}; Uninsured Gap is ${uncovered_gap:,.2f}."
-                    )
-
-            scenarios.append(
-                HypotheticalLossScenario(
-                    scenario_id=s_def["id"],
-                    scenario_name=s_def["name"],
-                    description=s_def["description"],
-                    coverage_category=cat,
-                    estimated_gross_loss=gross_loss,
-                    currency=policy.currency,
-                    coverage_status=coverage_status,
-                    applicable_limit=applicable_limit,
-                    applicable_deductible=applicable_deductible,
-                    applicable_coinsurance_pct=applicable_coins_pct,
-                    waiting_period_impact=waiting_impact,
-                    estimated_covered_amount=estimated_covered,
-                    estimated_insured_retention=insured_retention,
-                    estimated_uncovered_gap=uncovered_gap,
-                    calculation_explanation=explanation,
-                    assumptions_and_limitations=[
-                        "Hypothetical simulation based on standard insured loss profile.",
-                        "Does not constitute claim adjudication, settlement promise, or legal interpretation.",
-                        "Actual claim adjustments depend on third-party forensic proofs and proof of loss validation.",
-                    ],
-                )
+            sc = self._calculate_single_scenario(
+                scenario_id=s_def["id"],
+                name=s_def["name"],
+                desc=s_def["description"],
+                category=cat,
+                gross_loss=s_def["gross_loss"],
+                policy=policy,
+                section=sec_copy,
+                outage_duration_hours=s_def["outage_hours"],
             )
+            scenarios.append(sc)
 
         return scenarios

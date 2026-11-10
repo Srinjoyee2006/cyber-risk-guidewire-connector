@@ -152,7 +152,7 @@ export const OrganizationCoverageSection: React.FC<OrganizationCoverageSectionPr
             Cyber Insurance Policy & Coverage Gap Engine
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Explainable contract term mapping, actuarial risk gap detection, and deterministic financial loss simulations.
+            Explainable contract term mapping, risk gap detection, and simplified deterministic hypothetical loss calculations.
           </p>
         </div>
         <div className="flex items-center gap-2.5">

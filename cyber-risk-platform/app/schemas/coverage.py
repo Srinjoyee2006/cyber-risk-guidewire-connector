@@ -36,6 +36,7 @@ class WordingClarityEnum(str, Enum):
     EXPLICIT = "EXPLICIT"
     AMBIGUOUS = "AMBIGUOUS"
     INCOMPLETE = "INCOMPLETE"
+    CONFLICTING = "CONFLICTING"
 
 
 class PolicyStatusEnum(str, Enum):

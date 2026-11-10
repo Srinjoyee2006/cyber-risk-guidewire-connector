@@ -631,3 +631,288 @@ def test_evaluation_history_and_snapshot_immutability(client: TestClient, author
     # Verify governance disclaimer is attached
     assert "advisory" in hist1["governance_notice"].lower()
     assert "legal contract interpretation" in hist1["governance_notice"].lower()
+
+
+# =============================================================================
+# 8. Mathematics Invariants, Waiting Periods, General Exclusions & Authorization
+# =============================================================================
+
+def test_hypothetical_loss_mathematical_invariants_and_boundaries():
+    """
+    Exhaustive boundary testing of simplified deterministic hypothetical loss calculation:
+    - Zero loss.
+    - Loss below deductible.
+    - Loss equal to deductible.
+    - Loss above deductible.
+    - Loss below sublimit.
+    - Loss above sublimit.
+    - Loss above overall policy limit.
+    - 0% coinsurance.
+    - 100% coinsurance.
+    - Deductible greater than gross loss.
+    Verifies: Gross Loss == Carrier Payable + Insured Retention + Uncovered Gap for every scenario.
+    """
+    from app.core.coverage_engine import CoverageEngine
+
+    cases = [
+        # (gross_loss, deductible, coinsurance_pct, sublimit, overall_limit, status, desc)
+        (0.0, 50_000.0, 10.0, 1_000_000.0, 5_000_000.0, CoverageStatusEnum.COVERED, "Zero loss"),
+        (20_000.0, 50_000.0, 10.0, 1_000_000.0, 5_000_000.0, CoverageStatusEnum.COVERED, "Loss below deductible"),
+        (50_000.0, 50_000.0, 10.0, 1_000_000.0, 5_000_000.0, CoverageStatusEnum.COVERED, "Loss equal to deductible"),
+        (100_000.0, 50_000.0, 10.0, 1_000_000.0, 5_000_000.0, CoverageStatusEnum.COVERED, "Loss above deductible"),
+        (800_000.0, 50_000.0, 10.0, 1_000_000.0, 5_000_000.0, CoverageStatusEnum.COVERED, "Loss below sublimit"),
+        (2_500_000.0, 50_000.0, 10.0, 1_000_000.0, 5_000_000.0, CoverageStatusEnum.COVERED, "Loss above sublimit"),
+        (12_000_000.0, 100_000.0, 10.0, None, 5_000_000.0, CoverageStatusEnum.COVERED, "Loss above overall limit"),
+        (500_000.0, 50_000.0, 0.0, 1_000_000.0, 5_000_000.0, CoverageStatusEnum.COVERED, "0% coinsurance"),
+        (500_000.0, 50_000.0, 100.0, 1_000_000.0, 5_000_000.0, CoverageStatusEnum.COVERED, "100% coinsurance"),
+        (15_000.0, 75_000.0, 10.0, 500_000.0, 2_000_000.0, CoverageStatusEnum.COVERED, "Deductible > gross loss"),
+        (1_000_000.0, 50_000.0, 10.0, 500_000.0, 5_000_000.0, CoverageStatusEnum.EXCLUDED, "Excluded category"),
+        (1_000_000.0, 50_000.0, 10.0, 500_000.0, 5_000_000.0, CoverageStatusEnum.NOT_DOCUMENTED, "Not documented category"),
+        (1_000_000.0, 50_000.0, 10.0, 500_000.0, 5_000_000.0, CoverageStatusEnum.REVIEW_REQUIRED, "Review required category"),
+    ]
+
+    for gross, ded, coins, sub, overall, stat, desc in cases:
+        carrier, retention, gap, explanation, assumptions = (
+            CoverageEngine.calculate_hypothetical_loss_distribution(
+                gross_loss=gross,
+                deductible=ded,
+                coinsurance_pct=coins,
+                sublimit=sub,
+                overall_limit=overall,
+                coverage_status=stat,
+            )
+        )
+
+        effective_carrier = carrier if carrier is not None else 0.0
+        total_accounted = round(effective_carrier + retention + gap, 2)
+        assert total_accounted == round(gross, 2), (
+            f"Invariant failed for {desc}: {effective_carrier} + {retention} + {gap} = {total_accounted} != {gross}"
+        )
+        assert retention >= 0.0, f"Negative retention in {desc}"
+        assert gap >= 0.0, f"Negative gap in {desc}"
+        if carrier is not None:
+            assert carrier >= 0.0, f"Negative carrier payout in {desc}"
+        assert "Simplified deterministic hypothetical loss calculation" in explanation
+
+
+def test_business_interruption_waiting_period_boundaries():
+    """
+    Test waiting period boundary behavior in business interruption:
+    - Outage < waiting period: Carrier payable = 0, gap = gross loss.
+    - Outage == waiting period: Carrier payable = 0, gap = gross loss.
+    - Outage > waiting period: Time-deductible elimination period applied.
+    Verifies exact conservation: Gross Loss == Carrier Payable + Retention + Gap.
+    """
+    from app.core.coverage_engine import CoverageEngine
+
+    # 1. Outage shorter than waiting period (8h outage vs 12h waiting period)
+    carrier, retention, gap, exp, _ = CoverageEngine.calculate_hypothetical_loss_distribution(
+        gross_loss=600_000.0,
+        deductible=50_000.0,
+        coinsurance_pct=0.0,
+        sublimit=2_000_000.0,
+        overall_limit=5_000_000.0,
+        coverage_status=CoverageStatusEnum.COVERED,
+        outage_duration_hours=8.0,
+        waiting_period_hours=12,
+    )
+    assert carrier == 0.0
+    assert gap == 600_000.0
+    assert carrier + retention + gap == 600_000.0
+    assert "did not exceed the mandatory waiting period" in exp
+
+    # 2. Outage exactly equal to waiting period (12h outage vs 12h waiting period)
+    carrier2, retention2, gap2, exp2, _ = CoverageEngine.calculate_hypothetical_loss_distribution(
+        gross_loss=600_000.0,
+        deductible=50_000.0,
+        coinsurance_pct=0.0,
+        sublimit=2_000_000.0,
+        overall_limit=5_000_000.0,
+        coverage_status=CoverageStatusEnum.COVERED,
+        outage_duration_hours=12.0,
+        waiting_period_hours=12,
+    )
+    assert carrier2 == 0.0
+    assert gap2 == 600_000.0
+    assert carrier2 + retention2 + gap2 == 600_000.0
+
+    # 3. Outage longer than waiting period (48h outage vs 12h waiting period, $1,200,000 gross)
+    # Time retention = 1,200,000 * (12/48) = 300,000
+    # Eligible loss = 900,000
+    # Net loss = 900,000 - 50,000 = 850,000
+    # Carrier payout = 850,000
+    # Monetary retention = 50,000
+    # Total retention = 300,000 + 50,000 = 350,000
+    # Uncovered gap = 0.0
+    carrier3, retention3, gap3, exp3, _ = CoverageEngine.calculate_hypothetical_loss_distribution(
+        gross_loss=1_200_000.0,
+        deductible=50_000.0,
+        coinsurance_pct=0.0,
+        sublimit=2_000_000.0,
+        overall_limit=5_000_000.0,
+        coverage_status=CoverageStatusEnum.COVERED,
+        outage_duration_hours=48.0,
+        waiting_period_hours=12,
+    )
+    assert carrier3 == 850_000.0
+    assert retention3 == 350_000.0
+    assert gap3 == 0.0
+    assert carrier3 + retention3 + gap3 == 1_200_000.0
+
+
+def test_general_policy_exclusions_and_conflicting_wording(client: TestClient, authorized_org: Organization):
+    """
+    Verify:
+    1. A general policy exclusion for unpatched known vulnerabilities cannot be silently ignored
+       when the organization has aging critical CVEs.
+    2. A coverage section with CONFLICTING wording produces REVIEW_REQUIRED and a HIGH severity gap.
+    """
+    org_ref = authorized_org.organization_ref
+    now = datetime.now(timezone.utc)
+
+    # 1. Provision policy with General Exclusion for UNPATCHED_KNOWN_EXPLOITS and CONFLICTING section
+    policy_payload = {
+        "organization_ref": org_ref,
+        "policy_number": f"POL-EXCL-CONF-{uuid.uuid4().hex[:6].upper()}",
+        "insurer_name": "Lloyds Syndicate 2026",
+        "policy_status": "ACTIVE",
+        "start_date": now.isoformat(),
+        "expiry_date": (now + timedelta(days=365)).isoformat(),
+        "overall_limit": 5_000_000.0,
+        "currency": "USD",
+        "retention_deductible": 50_000.0,
+        "coinsurance_pct": 0.0,
+        "waiting_period_hours": 12,
+        "exclusions": ["UNPATCHED_KNOWN_EXPLOITS", "WAR_AND_TERRORISM"],
+        "sections": [
+            {
+                "category": "RANSOMWARE_EXTORTION",
+                "coverage_name": "Ransomware Extortion",
+                "status": "COVERED",  # Marked covered in schedule, but general exclusion applies!
+                "limit_amount": 2_000_000.0,
+                "is_sublimit": True,
+                "deductible_amount": 50_000.0,
+                "waiting_period_hours": 0,
+                "coinsurance_pct": 0.0,
+                "wording_clarity": "EXPLICIT",
+            },
+            {
+                "category": "REGULATORY_LEGAL",
+                "coverage_name": "Regulatory Fines & Defense",
+                "status": "COVERED",
+                "limit_amount": 1_000_000.0,
+                "is_sublimit": True,
+                "deductible_amount": 50_000.0,
+                "waiting_period_hours": 0,
+                "coinsurance_pct": 0.0,
+                "wording_clarity": "CONFLICTING",  # Conflicting clauses
+                "section_notes": "Rider 3 conflicts with Section 2 definition of regulatory proceedings.",
+            },
+        ],
+    }
+    client.post("/api/v1/policies", json=policy_payload)
+
+    # 2. Ingest telemetry with aging critical CVE
+    client.post(
+        "/api/v1/telemetry/ingest",
+        json={
+            "tenant_id": "TENANT-EXCL-TEST",
+            "company_name": authorized_org.display_name,
+            "policy_number": org_ref,
+            "organization_ref": org_ref,
+            "mfa_enforcement_rate": 0.99,
+            "exposed_rdp_port": False,
+            "open_ports": [80, 443],
+            "critical_cves": [
+                {
+                    "cve_id": "CVE-2024-21887",
+                    "cvss_score": 9.8,
+                    "severity": "CRITICAL",
+                    "aging_days": 25.0,  # Aged > 14 days
+                }
+            ],
+            "edr_agent_coverage": 0.95,
+            "immutable_backups_verified": True,
+            "source": "AGENT_AUDIT",
+        },
+    )
+
+    # Trigger evaluation
+    client.post("/api/v1/assessments/evaluate", json={"organization_ref": org_ref})
+    eval_resp = client.post("/api/v1/coverage/evaluate", json={"organization_ref": org_ref})
+    assert eval_resp.status_code == 200
+    data = eval_resp.json()
+
+    # Verify General Exclusion gap was triggered
+    gaps = data["coverage_gaps"]
+    assert any("General Policy Exclusion Triggered" in g["gap_title"] for g in gaps)
+
+    # Verify Ransomware Extortion status is downgraded from COVERED to REVIEW_REQUIRED due to general exclusion
+    cat_evals = {c["category"]: c for c in data["category_evaluations"]}
+    assert cat_evals["RANSOMWARE_EXTORTION"]["status"] == "REVIEW_REQUIRED"
+    assert "General exclusion" in cat_evals["RANSOMWARE_EXTORTION"]["evaluation_notes"]
+
+    # Verify Conflicting wording in Regulatory Legal triggered REVIEW_REQUIRED and gap
+    assert cat_evals["REGULATORY_LEGAL"]["status"] == "REVIEW_REQUIRED"
+    assert cat_evals["REGULATORY_LEGAL"]["wording_clarity"] == "CONFLICTING"
+    assert any("Conflicting" in g["gap_title"] for g in gaps)
+
+
+def test_comprehensive_authorization_and_isolation(client: TestClient, db_session: Session):
+    """
+    Test every policy and coverage endpoint for:
+    - Authorized organization (GRANTED): 200 OK
+    - Revoked organization (REVOKED): 403 Forbidden
+    - Pending authorization (PENDING): 403 Forbidden
+    - Nonexistent organization: 404 Not Found
+    """
+    # 1. Create Pending Org
+    pending_ref = f"PENDING-ORG-{uuid.uuid4().hex[:6].upper()}"
+    pending_org = Organization(
+        organization_ref=pending_ref,
+        display_name="Pending Review Org",
+        data_authorization_status="PENDING",
+        authorization_scope={},
+    )
+    db_session.add(pending_org)
+
+    # 2. Create Revoked Org
+    revoked_ref = f"REVOKED-ORG-{uuid.uuid4().hex[:6].upper()}"
+    revoked_org = Organization(
+        organization_ref=revoked_ref,
+        display_name="Revoked Access Org",
+        data_authorization_status="REVOKED",
+        authorization_scope={},
+    )
+    db_session.add(revoked_org)
+    db_session.commit()
+
+    try:
+        # PENDING org: 403 Forbidden
+        assert client.get(f"/api/v1/policies/organization/{pending_ref}").status_code == 403
+        assert client.post("/api/v1/coverage/evaluate", json={"organization_ref": pending_ref}).status_code == 403
+        assert client.get(f"/api/v1/coverage/latest/{pending_ref}").status_code == 403
+        assert client.get(f"/api/v1/coverage/history/{pending_ref}").status_code == 403
+        assert client.get(f"/api/v1/coverage/gaps/{pending_ref}").status_code == 403
+
+        # REVOKED org: 403 Forbidden
+        assert client.get(f"/api/v1/policies/organization/{revoked_ref}").status_code == 403
+        assert client.post("/api/v1/coverage/evaluate", json={"organization_ref": revoked_ref}).status_code == 403
+        assert client.get(f"/api/v1/coverage/latest/{revoked_ref}").status_code == 403
+        assert client.get(f"/api/v1/coverage/history/{revoked_ref}").status_code == 403
+        assert client.get(f"/api/v1/coverage/gaps/{revoked_ref}").status_code == 403
+
+        # NONEXISTENT org: 404 Not Found
+        nonexistent_ref = "NONEXISTENT-ORG-999999"
+        assert client.get(f"/api/v1/policies/organization/{nonexistent_ref}").status_code == 404
+        assert client.post("/api/v1/coverage/evaluate", json={"organization_ref": nonexistent_ref}).status_code == 404
+        assert client.get(f"/api/v1/coverage/latest/{nonexistent_ref}").status_code == 404
+
+        # Nonexistent policy ID
+        fake_policy_id = uuid.uuid4()
+        assert client.get(f"/api/v1/policies/{fake_policy_id}").status_code == 404
+
+    finally:
+        db_session.delete(pending_org)
+        db_session.delete(revoked_org)
+        db_session.commit()

@@ -54,14 +54,22 @@ class CoverageService:
         self.assessment_repo = AssessmentRepository(db)
         self.coverage_engine = CoverageEngine()
 
-    def _enforce_org_authorization(self, org_ref: Optional[str]) -> Optional[Organization]:
+    def _enforce_org_authorization(
+        self, org_ref: Optional[str], require_exists: bool = False
+    ) -> Optional[Organization]:
         """
         Enforces organization authorization boundary. Rejects with HTTP 403 Forbidden
         if an organization exists and its data authorization status is not 'GRANTED'.
+        If require_exists is True, raises HTTP 404 Not Found if organization does not exist.
         """
         if not org_ref:
             return None
         org = self.org_repo.get_by_ref(org_ref)
+        if require_exists and not org:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Organization '{org_ref}' was not found.",
+            )
         if org and not org.is_authorized():
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -209,7 +217,7 @@ class CoverageService:
         self, org_ref: str, limit: int = 50, offset: int = 0
     ) -> Sequence[InsurancePolicyResponse]:
         """Lists all policies for a given organization."""
-        self._enforce_org_authorization(org_ref)
+        self._enforce_org_authorization(org_ref, require_exists=True)
 
         # Seed demo policy if DEMO-ACME-001 has no policies
         if org_ref.upper() == "DEMO-ACME-001":
@@ -656,7 +664,7 @@ class CoverageService:
         self, org_ref: str, limit: int = 20, offset: int = 0
     ) -> Sequence[CoverageEvaluationResponse]:
         """Lists historical coverage evaluations for an organization."""
-        self._enforce_org_authorization(org_ref)
+        self._enforce_org_authorization(org_ref, require_exists=True)
         history = self.eval_repo.list_for_org(org_ref, limit=limit, offset=offset)
         return [self._evaluation_model_to_response(h) for h in history]
 
