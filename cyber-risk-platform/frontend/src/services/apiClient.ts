@@ -191,5 +191,23 @@ export const apiClient = {
   getAssetVulnerabilities: (assetId: string): Promise<import('../types/api').AssetVulnerabilitiesResponse> => {
     return fetchJson<import('../types/api').AssetVulnerabilitiesResponse>(`/api/v1/assets/${encodeURIComponent(assetId)}/vulnerabilities`)
   },
+
+  // Phase 1A: Organization-Specific Vulnerability Matching
+  getOrganizationVulnerabilitySummary: (orgRef: string): Promise<import('../types/api').OrganizationVulnerabilitySummary> => {
+    return fetchJson<import('../types/api').OrganizationVulnerabilitySummary>(`/api/v1/organizations/${encodeURIComponent(orgRef)}/vulnerability-summary`)
+  },
+
+  getOrganizationVulnerabilityMatches: (
+    orgRef: string,
+    params: import('../types/api').OrganizationMatchesQueryParams = {}
+  ): Promise<import('../types/api').OrganizationVulnerabilityMatchesResponse> => {
+    return fetchJson<import('../types/api').OrganizationVulnerabilityMatchesResponse>(
+      `/api/v1/organizations/${encodeURIComponent(orgRef)}/vulnerability-matches${buildQueryString(params)}`
+    )
+  },
+
+  getAssetVulnerabilityMatches: (assetId: string): Promise<import('../types/api').VulnerabilityMatchRecord[]> => {
+    return fetchJson<import('../types/api').VulnerabilityMatchRecord[]>(`/api/v1/assets/${encodeURIComponent(assetId)}/vulnerability-matches`)
+  },
 }
 

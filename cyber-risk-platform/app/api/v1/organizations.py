@@ -4,7 +4,7 @@ Organizations API Endpoints
 """
 
 import logging
-from typing import Sequence
+from typing import Optional, Sequence
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -17,6 +17,11 @@ from app.schemas.organization import (
     OrganizationResponse,
     OrganizationUpdate,
 )
+from app.schemas.observation import (
+    OrganizationVulnerabilitySummary,
+    OrganizationVulnerabilityMatchesResponse,
+)
+from app.services.vulnerability_matching_service import VulnerabilityMatchingService
 
 logger = logging.getLogger(__name__)
 
@@ -113,3 +118,46 @@ def update_organization(
     updated = repo.update(org)
     logger.info("Updated organization %s status to %s", updated.organization_ref, updated.data_authorization_status)
     return updated
+
+
+@router.get(
+    "/{organization_ref}/vulnerability-summary",
+    response_model=OrganizationVulnerabilitySummary,
+    summary="Get aggregated organization vulnerability matching summary",
+)
+def get_organization_vulnerability_summary(
+    organization_ref: str,
+    db: Session = Depends(get_db),
+) -> OrganizationVulnerabilitySummary:
+    service = VulnerabilityMatchingService(db)
+    return service.get_organization_vulnerability_summary(organization_ref)
+
+
+@router.get(
+    "/{organization_ref}/vulnerability-matches",
+    response_model=OrganizationVulnerabilityMatchesResponse,
+    summary="Get organization-scoped vulnerability matches with explainability and filtering",
+)
+def get_organization_vulnerability_matches(
+    organization_ref: str,
+    evidence_classification: Optional[str] = Query(default=None, description="CONFIRMED, POTENTIAL, or UNVERIFIED"),
+    severity: Optional[str] = Query(default=None, description="CRITICAL, HIGH, MEDIUM, LOW"),
+    kev: Optional[bool] = Query(default=None, description="Filter by CISA KEV status"),
+    cve_id: Optional[str] = Query(default=None, description="Search by CVE ID substring"),
+    asset_id: Optional[uuid.UUID] = Query(default=None, description="Filter by specific asset UUID"),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+) -> OrganizationVulnerabilityMatchesResponse:
+    service = VulnerabilityMatchingService(db)
+    return service.get_organization_vulnerability_matches(
+        organization_ref=organization_ref,
+        evidence_classification=evidence_classification,
+        severity=severity,
+        kev=kev,
+        cve_id=cve_id,
+        asset_id=asset_id,
+        limit=limit,
+        offset=offset,
+    )
+

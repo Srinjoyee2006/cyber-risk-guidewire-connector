@@ -260,3 +260,97 @@ export interface AssetVulnerabilitiesResponse {
   notice: string
 }
 
+// ----------------------------------------------------
+// Phase 1A: Organization Vulnerability Matching Types
+// ----------------------------------------------------
+
+export type EvidenceClassification = 'CONFIRMED' | 'POTENTIAL' | 'UNVERIFIED'
+
+export interface VulnerabilityMatchRecord {
+  organization_ref: string
+  asset_id: string
+  external_asset_ref: string
+  asset_hostname: string | null
+  asset_criticality: string
+  cve_id: string
+  vulnerability_description: string | null
+  cvss_score: number | null
+  cvss_severity: string | null
+  cvss_vector: string | null
+  kev_status: boolean
+  kev_date_added: string | null
+  kev_due_date: string | null
+  known_ransomware_use: boolean | null
+  prioritization_score: number | null
+  prioritization_category: PriorityBand | null
+  evidence_classification: EvidenceClassification
+  matching_method: string
+  matching_reason: string
+  confidence: string
+  limitations: string
+  observation_status: string | null
+  is_active_exposure: boolean
+  has_conflict: boolean
+  conflict_details: string | null
+  source_observation: Record<string, any> | null
+  asset_evidence: Record<string, any>
+  all_observations: Array<Record<string, any>>
+}
+
+export interface AffectedAssetSummary {
+  asset_id: string
+  external_asset_ref: string
+  hostname: string | null
+  asset_type: string
+  criticality: string
+  vendor: string | null
+  product: string | null
+  version: string | null
+  cpe_name: string | null
+  confirmed_count: number
+  potential_count: number
+  unverified_count: number
+  fixed_count: number
+  false_positive_count: number
+  critical_count: number
+  kev_count: number
+}
+
+export interface OrganizationVulnerabilitySummary {
+  organization_ref: string
+  display_name: string
+  data_authorization_status: DataAuthorizationStatus
+  total_assets: number
+  assets_with_confirmed_vulnerabilities: number
+  assets_with_potential_vulnerabilities: number
+  total_confirmed_matches: number
+  total_potential_matches: number
+  unverified_findings: number
+  fixed_findings: number
+  false_positives: number
+  critical_findings: number
+  kev_listed_findings: number
+  affected_assets: AffectedAssetSummary[]
+  rules_applied: string[]
+}
+
+export interface OrganizationVulnerabilityMatchesResponse {
+  organization_ref: string
+  summary: OrganizationVulnerabilitySummary
+  matches: VulnerabilityMatchRecord[]
+  total_matches: number
+  limit: number
+  offset: number
+}
+
+export interface OrganizationMatchesQueryParams {
+  evidence_classification?: string
+  severity?: string
+  kev?: boolean
+  cve_id?: string
+  asset_id?: string
+  limit?: number
+  offset?: number
+}
+
+

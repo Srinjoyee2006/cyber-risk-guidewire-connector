@@ -22,7 +22,9 @@ from app.schemas.asset import (
 )
 from app.schemas.observation import (
     AssetVulnerabilitiesResponse,
+    VulnerabilityMatchRecord,
 )
+from app.services.vulnerability_matching_service import VulnerabilityMatchingService
 
 logger = logging.getLogger(__name__)
 
@@ -106,3 +108,16 @@ def get_asset_vulnerabilities(
 ) -> AssetVulnerabilitiesResponse:
     service = AssetObservationService(db)
     return service.get_asset_vulnerabilities(asset_id)
+
+
+@router.get(
+    "/assets/{asset_id}/vulnerability-matches",
+    response_model=list[VulnerabilityMatchRecord],
+    summary="Get explainable vulnerability matches for an asset (Phase 1A)",
+)
+def get_asset_vulnerability_matches(
+    asset_id: uuid.UUID,
+    db: Session = Depends(get_db),
+) -> list[VulnerabilityMatchRecord]:
+    service = VulnerabilityMatchingService(db)
+    return service.get_asset_vulnerability_matches(asset_id)

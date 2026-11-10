@@ -79,3 +79,50 @@ export const CvssBadge: React.FC<{ score: number | null; severity?: string | nul
     </span>
   )
 }
+
+export const EvidenceBadge: React.FC<{ classification: 'CONFIRMED' | 'POTENTIAL' | 'UNVERIFIED' | string; status?: string | null; active?: boolean }> = ({
+  classification,
+  status,
+}) => {
+  const c = classification.toUpperCase()
+
+  let colorClasses = 'bg-slate-800 text-slate-300 border-slate-700'
+  let label = c
+
+  if (status === 'FIXED') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold bg-emerald-950/40 text-emerald-400 border border-emerald-800/40">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+        FIXED (REMEDIATED)
+      </span>
+    )
+  }
+
+  if (status === 'FALSE_POSITIVE') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+        FALSE POSITIVE
+      </span>
+    )
+  }
+
+  if (c === 'CONFIRMED') {
+    colorClasses = 'bg-rose-950/80 text-rose-300 border-rose-700/60 ring-1 ring-rose-500/20'
+    label = 'CONFIRMED EXPOSURE'
+  } else if (c === 'POTENTIAL') {
+    colorClasses = 'bg-amber-950/80 text-amber-300 border-amber-700/60'
+    label = 'POTENTIAL APPLICABILITY'
+  } else if (c === 'UNVERIFIED') {
+    colorClasses = 'bg-slate-800/80 text-slate-300 border-slate-600'
+    label = 'UNVERIFIED EVIDENCE'
+  }
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-xs font-semibold border ${colorClasses}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${c === 'CONFIRMED' ? 'bg-rose-400 animate-pulse' : c === 'POTENTIAL' ? 'bg-amber-400' : 'bg-slate-400'}`}></span>
+      {label}
+    </span>
+  )
+}
+
