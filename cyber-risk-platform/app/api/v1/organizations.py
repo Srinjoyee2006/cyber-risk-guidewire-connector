@@ -21,7 +21,10 @@ from app.schemas.observation import (
     OrganizationVulnerabilitySummary,
     OrganizationVulnerabilityMatchesResponse,
 )
+from app.schemas.telemetry import TelemetrySnapshot, TelemetryIngestResponse
+from app.schemas.risk import RiskAssessmentResult, AssessmentRequest
 from app.services.vulnerability_matching_service import VulnerabilityMatchingService
+from app.services.assessment_service import AssessmentService
 
 logger = logging.getLogger(__name__)
 
@@ -143,21 +146,124 @@ def get_organization_vulnerability_matches(
     evidence_classification: Optional[str] = Query(default=None, description="CONFIRMED, POTENTIAL, or UNVERIFIED"),
     severity: Optional[str] = Query(default=None, description="CRITICAL, HIGH, MEDIUM, LOW"),
     kev: Optional[bool] = Query(default=None, description="Filter by CISA KEV status"),
+    kev_only: Optional[bool] = Query(default=None, description="Filter by CISA KEV status (alias for kev)"),
     cve_id: Optional[str] = Query(default=None, description="Search by CVE ID substring"),
     asset_id: Optional[uuid.UUID] = Query(default=None, description="Filter by specific asset UUID"),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> OrganizationVulnerabilityMatchesResponse:
+    effective_kev = kev if kev is not None else kev_only
     service = VulnerabilityMatchingService(db)
     return service.get_organization_vulnerability_matches(
         organization_ref=organization_ref,
         evidence_classification=evidence_classification,
         severity=severity,
-        kev=kev,
+        kev=effective_kev,
         cve_id=cve_id,
         asset_id=asset_id,
         limit=limit,
         offset=offset,
     )
+
+
+# ==============================================================================
+# Phase 1B: Persistent Organization Telemetry & Risk Assessment Endpoints
+# ==============================================================================
+
+@router.get(
+    "/{organization_ref}/telemetry/latest",
+    response_model=TelemetrySnapshot,
+    summary="Get latest persisted telemetry snapshot for an organization",
+)
+def get_organization_latest_telemetry(
+    organization_ref: str,
+    db: Session = Depends(get_db),
+) -> TelemetrySnapshot:
+    service = AssessmentService(db)
+    snapshot = service.get_latest_telemetry(organization_ref)
+    if not snapshot:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No telemetry found for organization '{organization_ref}'.",
+        )
+    return snapshot
+
+
+@router.post(
+    "/{organization_ref}/telemetry",
+    response_model=TelemetryIngestResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Ingest and persist telemetry snapshot for an organization",
+)
+def ingest_organization_telemetry(
+    organization_ref: str,
+    snapshot: TelemetrySnapshot,
+    db: Session = Depends(get_db),
+) -> TelemetryIngestResponse:
+    snapshot.organization_ref = organization_ref
+    service = AssessmentService(db)
+    return service.ingest_telemetry(snapshot)
+
+
+@router.get(
+    "/{organization_ref}/telemetry/history",
+    response_model=list[TelemetrySnapshot],
+    summary="Get historical persisted telemetry snapshots for an organization",
+)
+def get_organization_telemetry_history(
+    organization_ref: str,
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+) -> list[TelemetrySnapshot]:
+    service = AssessmentService(db)
+    return service.list_telemetry_history(organization_ref, limit=limit)
+
+
+@router.post(
+    "/{organization_ref}/assessments/evaluate",
+    response_model=RiskAssessmentResult,
+    summary="Evaluate and persist on-demand actuarial risk assessment for organization",
+)
+async def evaluate_organization_assessment(
+    organization_ref: str,
+    trigger_guidewire_workflow: bool = Query(default=True),
+    db: Session = Depends(get_db),
+) -> RiskAssessmentResult:
+    service = AssessmentService(db)
+    req = AssessmentRequest(
+        organization_ref=organization_ref,
+        policy_number=organization_ref,
+        trigger_guidewire_workflow=trigger_guidewire_workflow,
+    )
+    return await service.evaluate_assessment(req)
+
+
+@router.get(
+    "/{organization_ref}/assessments",
+    response_model=list[RiskAssessmentResult],
+    summary="List historical persisted assessments for organization",
+)
+def list_organization_assessments(
+    organization_ref: str,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+) -> list[RiskAssessmentResult]:
+    service = AssessmentService(db)
+    return service.list_assessments_for_org(organization_ref, limit=limit, offset=offset)
+
+
+@router.get(
+    "/{organization_ref}/assessments/latest",
+    response_model=RiskAssessmentResult,
+    summary="Get latest persisted assessment for organization",
+)
+def get_organization_latest_assessment(
+    organization_ref: str,
+    db: Session = Depends(get_db),
+) -> RiskAssessmentResult:
+    service = AssessmentService(db)
+    return service.get_latest_assessment_for_org(organization_ref)
+
 

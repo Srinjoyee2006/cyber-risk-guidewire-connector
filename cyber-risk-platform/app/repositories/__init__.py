@@ -10,6 +10,8 @@ from app.repositories.prioritization_repository import PrioritizationRepository
 from app.repositories.organization_repository import OrganizationRepository
 from app.repositories.asset_repository import AssetRepository
 from app.repositories.observation_repository import ObservationRepository
+from app.repositories.telemetry_repository import TelemetryRepository
+from app.repositories.assessment_repository import AssessmentRepository
 
 __all__ = [
     "IngestionRepository",
@@ -19,5 +21,7 @@ __all__ = [
     "OrganizationRepository",
     "AssetRepository",
     "ObservationRepository",
+    "TelemetryRepository",
+    "AssessmentRepository",
 ]
 

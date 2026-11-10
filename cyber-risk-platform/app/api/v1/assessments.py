@@ -1,33 +1,31 @@
 """
 CyberRisk-Guidewire-Connector (CRGC)
-Assessments API - Trigger Risk Evaluation & Underwriter Review Workflow
+Assessments API - Trigger Risk Evaluation & Underwriter Review Workflow (Persistent Database Storage)
 """
 
 import json
 import logging
 from pathlib import Path
-from typing import Annotated, Dict, Optional
-from uuid import uuid4
+from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
 
 from config.settings import Settings, get_settings
-from app.api.v1.telemetry import get_stored_telemetry, store_telemetry
+from app.db.session import get_db, SessionLocal
 from app.core.risk_engine import RiskEngine
 from app.core.coverage_engine import CoverageEngine
 from app.schemas.telemetry import TelemetrySnapshot
 from app.schemas.risk import (
     AssessmentRequest,
     RiskAssessmentResult,
-    PolicyAction,
+    AssessmentComparisonResult,
 )
 from app.services.guidewire_client import GuidewireClient
+from app.services.assessment_service import AssessmentService
 
 logger = logging.getLogger("crgc.api.assessments")
 
 router = APIRouter(prefix="/assessments", tags=["Risk Assessment & Guidewire Workflow"])
-
-# In-memory storage of completed assessments for audit history
-_assessments_store: Dict[str, RiskAssessmentResult] = {}
 
 
 def get_risk_engine(settings: Annotated[Settings, Depends(get_settings)]) -> RiskEngine:
@@ -59,108 +57,21 @@ def load_scenarios_data() -> dict:
     response_model=RiskAssessmentResult,
     summary="Evaluate Policy Risk & Trigger Guidewire Workflow",
     description=(
-        "Executes explainable actuarial risk scoring on the latest ingested telemetry. "
-        "If score > 60 (REVIEW_REQUIRED), automatically dispatches an Underwriter Activity "
-        "and Policy Audit Note to Guidewire PolicyCenter 10.2.1."
+        "Executes explainable actuarial risk scoring on the latest persisted telemetry and organization vulnerability matches. "
+        "Stores the assessment, factor breakdown, and vulnerability evidence snapshots persistently in SQLite. "
+        "If score > 60 (REVIEW_REQUIRED), automatically dispatches an Underwriter Activity and Policy Audit Note to Guidewire PolicyCenter 10.2.1."
     ),
 )
 async def evaluate_assessment(
     request: AssessmentRequest,
-    risk_engine: Annotated[RiskEngine, Depends(get_risk_engine)],
-    coverage_engine: Annotated[CoverageEngine, Depends(get_coverage_engine)],
-    gw_client: Annotated[GuidewireClient, Depends(get_guidewire_client)],
+    db: Session = Depends(get_db),
+    settings: Annotated[Settings, Depends(get_settings)] = None,
 ) -> RiskAssessmentResult:
     """
-    Execute actuarial evaluation on latest telemetry for policy.
+    Execute actuarial evaluation on latest telemetry for policy/organization and persist results.
     """
-    telemetry = get_stored_telemetry(request.policy_number)
-    if not telemetry:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=(
-                f"No telemetry found for policy '{request.policy_number}'. "
-                f"Please ingest telemetry first or run a scenario via /assessments/scenarios/{{scenario_id}}/execute."
-            ),
-        )
-
-    # 1. Run deterministic Actuarial Risk Engine
-    aggregate_score, factor_penalties = risk_engine.compute_risk_score(telemetry)
-    risk_tier = risk_engine.determine_risk_tier(aggregate_score)
-    policy_action = risk_engine.determine_policy_action(aggregate_score)
-
-    # 2. Run Coverage Engine to evaluate policy terms & endorsements
-    coverage_recommendations = coverage_engine.evaluate_coverage(
-        policy_number=telemetry.policy_number,
-        risk_score=aggregate_score,
-        risk_tier=risk_tier,
-        policy_action=policy_action,
-        factor_penalties=factor_penalties,
-    )
-
-    assessment_id = f"ASM-{uuid4().hex[:8].upper()}"
-
-    telemetry_summary = {
-        "mfa_enforcement_rate": f"{telemetry.mfa_enforcement_rate * 100:.1f}%",
-        "exposed_rdp_port": telemetry.exposed_rdp_port,
-        "critical_cves_count": telemetry.critical_cve_count,
-        "edr_agent_coverage": f"{telemetry.edr_agent_coverage * 100:.1f}%",
-        "open_ports": telemetry.open_ports,
-        "immutable_backups_verified": telemetry.immutable_backups_verified,
-    }
-
-    # 3. Form initial assessment object
-    assessment = RiskAssessmentResult(
-        assessment_id=assessment_id,
-        policy_number=telemetry.policy_number,
-        company_name=telemetry.company_name,
-        base_score=risk_engine.settings.base_risk_score,
-        aggregate_risk_score=aggregate_score,
-        risk_tier=risk_tier,
-        policy_action=policy_action,
-        factor_breakdowns=factor_penalties,
-        coverage_recommendations=coverage_recommendations,
-        telemetry_summary=telemetry_summary,
-        guidewire_activity_created=False,
-    )
-
-    # 4. Guidewire Cloud Integration Trigger
-    # Triggered when action is REVIEW_REQUIRED (Score > 60) and workflow trigger is enabled
-    if request.trigger_guidewire_workflow and policy_action == PolicyAction.REVIEW_REQUIRED:
-        logger.warning(
-            "Policy %s exceeded review threshold (Score=%.1f). Triggering Guidewire PolicyCenter 10.2.1 activity creation.",
-            telemetry.policy_number,
-            aggregate_score,
-        )
-        try:
-            # Create Policy Note for audit trail
-            note_resp = await gw_client.create_policy_note(
-                policy_number=telemetry.policy_number,
-                assessment=assessment,
-            )
-            assessment.guidewire_note_id = note_resp.data.id
-
-            # Create Underwriter Review Activity Task
-            activity_resp = await gw_client.create_underwriter_activity(
-                policy_number=telemetry.policy_number,
-                assessment=assessment,
-            )
-            assessment.guidewire_activity_created = True
-            assessment.guidewire_activity_id = activity_resp.data.id
-
-            logger.info(
-                "Successfully dispatched Guidewire Activity %s and Note %s for policy %s",
-                assessment.guidewire_activity_id,
-                assessment.guidewire_note_id,
-                telemetry.policy_number,
-            )
-        except Exception as e:
-            logger.error("Failed to execute Guidewire Cloud integration: %s", str(e), exc_info=True)
-            # Retain assessment results even if external call fails
-            assessment.coverage_recommendations.underwriter_notes += f" [Guidewire Dispatch Warning: {str(e)}]"
-
-    # Store for audit trail
-    _assessments_store[assessment.assessment_id] = assessment
-    return assessment
+    service = AssessmentService(db, settings=settings)
+    return await service.evaluate_assessment(request)
 
 
 @router.post(
@@ -174,13 +85,12 @@ async def evaluate_assessment(
 )
 async def execute_scenario(
     scenario_id: str,
-    risk_engine: Annotated[RiskEngine, Depends(get_risk_engine)],
-    coverage_engine: Annotated[CoverageEngine, Depends(get_coverage_engine)],
-    gw_client: Annotated[GuidewireClient, Depends(get_guidewire_client)],
+    db: Session = Depends(get_db),
+    settings: Annotated[Settings, Depends(get_settings)] = None,
 ) -> RiskAssessmentResult:
     """
     Run one of the predefined deterministic scenarios directly.
-    Auto-ingests the scenario's telemetry, runs the engines, and dispatches Guidewire activities if applicable.
+    Persists scenario telemetry, computes assessment, stores factor breakdowns and evidence, and dispatches Guidewire activities if applicable.
     """
     data = load_scenarios_data()
     scenarios = data.get("scenarios", {})
@@ -196,20 +106,16 @@ async def execute_scenario(
     telemetry_raw = scenario["telemetry"]
     snapshot = TelemetrySnapshot.model_validate(telemetry_raw)
 
-    # Ingest into store
-    store_telemetry(snapshot)
+    service = AssessmentService(db, settings=settings)
+    # 1. Ingest scenario telemetry into database
+    service.ingest_telemetry(snapshot)
 
-    # Evaluate
+    # 2. Evaluate and persist assessment
     req = AssessmentRequest(
         policy_number=snapshot.policy_number,
         trigger_guidewire_workflow=True,
     )
-    return await evaluate_assessment(
-        request=req,
-        risk_engine=risk_engine,
-        coverage_engine=coverage_engine,
-        gw_client=gw_client,
-    )
+    return await service.evaluate_assessment(req)
 
 
 @router.get(
@@ -236,19 +142,47 @@ async def list_scenarios() -> dict:
 
 
 @router.get(
+    "/compare",
+    response_model=AssessmentComparisonResult,
+    summary="Compare Two Risk Assessments (Query Params)",
+    description="Compares two persisted historical assessments and calculates factor diffs, score changes, and evidence changes.",
+)
+async def compare_assessments_query(
+    base_id: str = Query(..., description="ID of baseline assessment"),
+    target_id: str = Query(..., description="ID of target assessment to compare against baseline"),
+    db: Session = Depends(get_db),
+) -> AssessmentComparisonResult:
+    service = AssessmentService(db)
+    return service.compare_assessments(base_id=base_id, target_id=target_id)
+
+
+@router.get(
+    "/compare/{base_id}/{target_id}",
+    response_model=AssessmentComparisonResult,
+    summary="Compare Two Risk Assessments (Path Params)",
+    description="Compares two persisted historical assessments and calculates factor diffs, score changes, and evidence changes.",
+)
+async def compare_assessments_path(
+    base_id: str,
+    target_id: str,
+    db: Session = Depends(get_db),
+) -> AssessmentComparisonResult:
+    service = AssessmentService(db)
+    return service.compare_assessments(base_id=base_id, target_id=target_id)
+
+
+@router.get(
     "/{assessment_id}",
     response_model=RiskAssessmentResult,
     summary="Get Assessment Details by ID",
 )
-async def get_assessment(assessment_id: str) -> RiskAssessmentResult:
-    """Retrieve an assessment by its unique ID."""
-    assessment = _assessments_store.get(assessment_id)
-    if not assessment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Assessment '{assessment_id}' not found.",
-        )
-    return assessment
+async def get_assessment(
+    assessment_id: str,
+    db: Session = Depends(get_db),
+) -> RiskAssessmentResult:
+    """Retrieve an assessment by its unique ID from database storage."""
+    service = AssessmentService(db)
+    return service.get_assessment(assessment_id)
 
 
 @router.get(
@@ -256,19 +190,11 @@ async def get_assessment(assessment_id: str) -> RiskAssessmentResult:
     response_model=list[dict],
     summary="List Recent Assessments",
 )
-async def list_assessments() -> list[dict]:
-    """List recent assessments summary."""
-    return [
-        {
-            "assessment_id": a.assessment_id,
-            "timestamp": a.timestamp.isoformat(),
-            "policy_number": a.policy_number,
-            "company_name": a.company_name,
-            "aggregate_risk_score": a.aggregate_risk_score,
-            "risk_tier": a.risk_tier.value,
-            "policy_action": a.policy_action.value,
-            "guidewire_activity_created": a.guidewire_activity_created,
-            "guidewire_activity_id": a.guidewire_activity_id,
-        }
-        for a in _assessments_store.values()
-    ]
+async def list_assessments(
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    """List recent assessments summary from persistent database storage."""
+    service = AssessmentService(db)
+    return service.list_all_assessments(limit=limit, offset=offset)

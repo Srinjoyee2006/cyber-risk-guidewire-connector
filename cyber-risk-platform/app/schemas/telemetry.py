@@ -43,9 +43,9 @@ class CVEItem(BaseModel):
         ),
     ]
     aging_days: Annotated[
-        int,
+        float,
         Field(
-            ge=0,
+            ge=0.0,
             description="Elapsed days since vulnerability public disclosure without applied patch",
             examples=[28],
         ),
@@ -95,6 +95,22 @@ class TelemetrySnapshot(BaseModel):
             examples=["POL-001"],
         ),
     ]
+    organization_ref: Annotated[
+        Optional[str],
+        Field(
+            default=None,
+            description="Associated insured organization reference in CRGC",
+            examples=["DEMO-ACME-001"],
+        ),
+    ] = None
+    source: Annotated[
+        str,
+        Field(
+            default="EDGE_ASM",
+            description="Originating telemetry feed source",
+            examples=["EDGE_ASM", "QUALYS", "DEFENDER", "OKTA"],
+        ),
+    ] = "EDGE_ASM"
     timestamp: Annotated[
         datetime,
         Field(

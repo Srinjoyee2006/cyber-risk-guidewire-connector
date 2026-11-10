@@ -11,7 +11,7 @@ from app.main import app
 @pytest.mark.asyncio
 async def test_health_and_root():
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    async with AsyncClient(transport=transport, base_url="http://test", timeout=10.0) as client:
         # Root endpoint
         resp_root = await client.get("/")
         assert resp_root.status_code == 200

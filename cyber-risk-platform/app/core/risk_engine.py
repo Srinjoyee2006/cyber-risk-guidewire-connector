@@ -116,13 +116,16 @@ class RiskEngine:
             FactorPenalty: Actuarial factor penalty breakdown for aging critical CVEs.
         """
         aging_threshold: int = self.settings.critical_cve_aging_days_threshold
-        aging_critical: list[CVEItem] = [
-            cve for cve in cves
-            if (cve.severity == CVESeverity.CRITICAL or cve.cvss_score >= 9.0)
-            and cve.aging_days > aging_threshold
-        ]
+        # Deduplicate by distinct CVE ID across multiple scanners/assets
+        unique_aging_critical: dict[str, CVEItem] = {}
+        for cve in cves:
+            if (cve.severity == CVESeverity.CRITICAL or cve.cvss_score >= 9.0) and cve.aging_days > aging_threshold:
+                if cve.cve_id not in unique_aging_critical:
+                    unique_aging_critical[cve.cve_id] = cve
+                elif cve.aging_days > unique_aging_critical[cve.cve_id].aging_days:
+                    unique_aging_critical[cve.cve_id] = cve
 
-        count: int = len(aging_critical)
+        count: int = len(unique_aging_critical)
         if count == 0:
             return FactorPenalty(
                 factor_name="CRITICAL_CVE_AGING",
@@ -135,7 +138,7 @@ class RiskEngine:
 
         raw_penalty: float = count * self.settings.penalty_critical_cve_per_item
         penalty: float = min(self.settings.penalty_critical_cve_max, round(raw_penalty, 2))
-        cve_list: str = ", ".join([f"{c.cve_id} ({c.aging_days}d)" for c in aging_critical])
+        cve_list: str = ", ".join([f"{c.cve_id} ({c.aging_days}d)" for c in unique_aging_critical.values()])
 
         return FactorPenalty(
             factor_name="CRITICAL_CVE_AGING",

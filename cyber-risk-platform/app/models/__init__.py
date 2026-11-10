@@ -10,6 +10,12 @@ from app.models.prioritization import VulnerabilityPrioritization
 from app.models.organization import Organization
 from app.models.asset import Asset
 from app.models.observation import VulnerabilityObservation, generate_observation_dedup_hash
+from app.models.assessment import (
+    TelemetrySnapshotModel,
+    RiskAssessmentModel,
+    AssessmentFactorBreakdownModel,
+    AssessmentEvidenceSnapshotModel,
+)
 
 __all__ = [
     "DataIngestionRun",
@@ -20,5 +26,9 @@ __all__ = [
     "Asset",
     "VulnerabilityObservation",
     "generate_observation_dedup_hash",
+    "TelemetrySnapshotModel",
+    "RiskAssessmentModel",
+    "AssessmentFactorBreakdownModel",
+    "AssessmentEvidenceSnapshotModel",
 ]
 

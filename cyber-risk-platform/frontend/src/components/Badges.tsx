@@ -126,3 +126,49 @@ export const EvidenceBadge: React.FC<{ classification: 'CONFIRMED' | 'POTENTIAL'
   )
 }
 
+export const RiskTierBadge: React.FC<{ tier: string; score?: number }> = ({ tier, score }) => {
+  const t = tier.toUpperCase()
+  let color = 'bg-slate-800 text-slate-300 border-slate-700'
+
+  if (t === 'LOW') {
+    color = 'bg-emerald-950/80 text-emerald-300 border-emerald-700/60'
+  } else if (t === 'MEDIUM') {
+    color = 'bg-amber-950/80 text-amber-300 border-amber-700/60'
+  } else if (t === 'HIGH') {
+    color = 'bg-orange-950/80 text-orange-300 border-orange-700/60'
+  } else if (t === 'CRITICAL') {
+    color = 'bg-rose-950/80 text-rose-300 border-rose-700/60 ring-1 ring-rose-500/20'
+  }
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-xs font-bold border ${color}`}>
+      <span>{t} RISK</span>
+      {score !== undefined && <span className="font-mono opacity-80">({score.toFixed(1)})</span>}
+    </span>
+  )
+}
+
+export const PolicyActionBadge: React.FC<{ action: string }> = ({ action }) => {
+  const a = action.toUpperCase()
+  let color = 'bg-slate-800 text-slate-300 border-slate-700'
+  let label = a
+
+  if (a === 'NOMINAL') {
+    color = 'bg-emerald-950/80 text-emerald-300 border-emerald-700/60'
+    label = 'NOMINAL (IN-FORCE)'
+  } else if (a === 'MONITOR') {
+    color = 'bg-amber-950/80 text-amber-300 border-amber-700/60'
+    label = 'MONITOR (ADVISORY)'
+  } else if (a === 'REVIEW_REQUIRED') {
+    color = 'bg-rose-950/80 text-rose-300 border-rose-700/60 ring-1 ring-rose-500/20'
+    label = 'REVIEW REQUIRED (DISPATCHED)'
+  }
+
+  return (
+    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold border ${color}`}>
+      <span>{label}</span>
+    </span>
+  )
+}
+
+

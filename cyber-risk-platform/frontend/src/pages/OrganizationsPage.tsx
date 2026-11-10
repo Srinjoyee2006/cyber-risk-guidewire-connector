@@ -10,6 +10,7 @@ import {
   Layers,
   Search,
   Eye,
+  Activity,
 } from 'lucide-react'
 import { apiClient } from '../services/apiClient'
 import type {
@@ -23,6 +24,7 @@ import type {
 } from '../types/api'
 import { PriorityBadge, KevBadge, CvssBadge, EvidenceBadge } from '../components/Badges'
 import { MatchInspectionModal } from '../components/MatchInspectionModal'
+import { OrganizationAssessmentsSection } from '../components/OrganizationAssessmentsSection'
 
 export const OrganizationsPage: React.FC = () => {
   const [organizations, setOrganizations] = useState<OrganizationResponse[]>([])
@@ -39,7 +41,7 @@ export const OrganizationsPage: React.FC = () => {
   const [selectedMatch, setSelectedMatch] = useState<VulnerabilityMatchRecord | null>(null)
 
   // Navigation tab for organization details
-  const [orgTab, setOrgTab] = useState<'ASSETS' | 'MATCHES' | 'IMPORT'>('ASSETS')
+  const [orgTab, setOrgTab] = useState<'ASSETS' | 'MATCHES' | 'ASSESSMENTS' | 'IMPORT'>('ASSETS')
 
   // Filters for matches tab
   const [searchQuery, setSearchQuery] = useState('')
@@ -397,7 +399,7 @@ export const OrganizationsPage: React.FC = () => {
                 )}
               </div>
 
-              {/* Sub-Tabs: Vulnerability Matches | Registered Assets | CSV Importer */}
+              {/* Sub-Tabs: Vulnerability Matches | Registered Assets | Assessments & History | CSV Importer */}
               <div className="flex border-b border-slate-800 gap-2">
                 <button
                   onClick={() => setOrgTab('MATCHES')}
@@ -409,6 +411,17 @@ export const OrganizationsPage: React.FC = () => {
                 >
                   <Layers className="w-3.5 h-3.5" />
                   Vulnerability Matches ({summary?.total_confirmed_matches !== undefined ? (summary.total_confirmed_matches + summary.total_potential_matches + summary.unverified_findings) : 0})
+                </button>
+                <button
+                  onClick={() => setOrgTab('ASSESSMENTS')}
+                  className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${
+                    orgTab === 'ASSESSMENTS'
+                      ? 'border-indigo-500 text-indigo-400'
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Activity className="w-3.5 h-3.5" />
+                  Assessments & History
                 </button>
                 <button
                   onClick={() => setOrgTab('ASSETS')}
@@ -743,6 +756,11 @@ export const OrganizationsPage: React.FC = () => {
                     </div>
                   )}
                 </div>
+              )}
+
+              {/* TAB 4: RISK ASSESSMENTS & TELEMETRY HISTORY (Phase 1B) */}
+              {orgTab === 'ASSESSMENTS' && (
+                <OrganizationAssessmentsSection organization={selectedOrg} />
               )}
             </>
           ) : (

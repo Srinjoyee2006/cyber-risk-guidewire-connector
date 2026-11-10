@@ -209,5 +209,42 @@ export const apiClient = {
   getAssetVulnerabilityMatches: (assetId: string): Promise<import('../types/api').VulnerabilityMatchRecord[]> => {
     return fetchJson<import('../types/api').VulnerabilityMatchRecord[]>(`/api/v1/assets/${encodeURIComponent(assetId)}/vulnerability-matches`)
   },
+
+  // Phase 1B: Persistent Organization Assessments & Telemetry
+  getOrganizationTelemetryLatest: (orgRef: string): Promise<import('../types/api').TelemetrySnapshot> => {
+    return fetchJson<import('../types/api').TelemetrySnapshot>(`/api/v1/organizations/${encodeURIComponent(orgRef)}/telemetry/latest`)
+  },
+
+  ingestOrganizationTelemetry: (orgRef: string, payload: Record<string, any>): Promise<any> => {
+    return fetchJson<any>(`/api/v1/organizations/${encodeURIComponent(orgRef)}/telemetry`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  evaluateOrganizationAssessment: (orgRef: string): Promise<import('../types/api').RiskAssessmentResult> => {
+    return fetchJson<import('../types/api').RiskAssessmentResult>(
+      `/api/v1/organizations/${encodeURIComponent(orgRef)}/assessments/evaluate?trigger_guidewire_workflow=true`,
+      { method: 'POST' }
+    )
+  },
+
+  getOrganizationAssessments: (orgRef: string): Promise<import('../types/api').RiskAssessmentResult[]> => {
+    return fetchJson<import('../types/api').RiskAssessmentResult[]>(`/api/v1/organizations/${encodeURIComponent(orgRef)}/assessments`)
+  },
+
+  getOrganizationLatestAssessment: (orgRef: string): Promise<import('../types/api').RiskAssessmentResult> => {
+    return fetchJson<import('../types/api').RiskAssessmentResult>(`/api/v1/organizations/${encodeURIComponent(orgRef)}/assessments/latest`)
+  },
+
+  getAssessmentById: (assessmentId: string): Promise<import('../types/api').RiskAssessmentResult> => {
+    return fetchJson<import('../types/api').RiskAssessmentResult>(`/api/v1/assessments/${encodeURIComponent(assessmentId)}`)
+  },
+
+  compareAssessments: (baseId: string, targetId: string): Promise<import('../types/api').AssessmentComparisonResult> => {
+    return fetchJson<import('../types/api').AssessmentComparisonResult>(
+      `/api/v1/assessments/compare?base_id=${encodeURIComponent(baseId)}&target_id=${encodeURIComponent(targetId)}`
+    )
+  },
 }
 

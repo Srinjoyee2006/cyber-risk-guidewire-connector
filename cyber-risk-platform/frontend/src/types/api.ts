@@ -353,4 +353,116 @@ export interface OrganizationMatchesQueryParams {
   offset?: number
 }
 
+// ==============================================================================
+// Phase 1B: Persistent Organization Telemetry & Assessments
+// ==============================================================================
+
+export type RiskTier = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+export type PolicyAction = 'NOMINAL' | 'MONITOR' | 'REVIEW_REQUIRED'
+
+export interface FactorPenalty {
+  factor_name: string
+  penalty_points: number
+  observed_value: any
+  benchmark_threshold: any
+  explanation: string
+  actuarial_rationale: string
+  evidence_source?: string | null
+  evidence_classification?: string | null
+  evidence_timestamp?: string | null
+}
+
+export interface CoverageRecommendation {
+  action: PolicyAction
+  financial_exposure?: any
+  ransomware_sublimit_adjustment_pct?: number | null
+  retention_deductible_multiplier?: number | null
+  coinsurance_requirement_pct?: number | null
+  recommended_endorsement_code?: string | null
+  underwriter_notes: string
+}
+
+export interface TelemetrySnapshot {
+  tenant_id: string
+  company_name: string
+  policy_number: string
+  organization_ref?: string | null
+  source?: string
+  timestamp: string
+  mfa_enforcement_rate: number
+  exposed_rdp_port: boolean
+  open_ports: number[]
+  critical_cves: any[]
+  edr_agent_coverage: number
+  immutable_backups_verified: boolean
+  security_awareness_training_rate: number
+}
+
+export interface RiskAssessmentResult {
+  assessment_id: string
+  timestamp: string
+  organization_ref?: string | null
+  policy_number: string
+  company_name: string
+  assessment_type: string
+  base_score: number
+  aggregate_risk_score: number
+  risk_tier: RiskTier
+  policy_action: PolicyAction
+  calculation_formula: string
+  status: string
+  previous_assessment_id?: string | null
+  factor_breakdowns: FactorPenalty[]
+  coverage_recommendations: CoverageRecommendation
+  telemetry_summary: Record<string, any>
+  vulnerability_evidence?: Array<Record<string, any>>
+  guidewire_activity_created: boolean
+  guidewire_activity_id?: string | null
+  guidewire_note_id?: string | null
+}
+
+export interface FactorComparisonItem {
+  factor_identifier: string
+  factor_name: string
+  base_penalty: number
+  target_penalty: number
+  penalty_delta: number
+  direction: 'INCREASED' | 'DECREASED' | 'UNCHANGED'
+  base_observed: any
+  target_observed: any
+  explanation: string
+}
+
+export interface VulnerabilityEvidenceDiff {
+  added_cves: any[]
+  resolved_cves: any[]
+  persisting_cves: any[]
+  added_count: number
+  resolved_count: number
+  persisting_count: number
+}
+
+export interface AssessmentComparisonResult {
+  base_assessment_id: string
+  target_assessment_id: string
+  organization_ref: string
+  policy_number: string
+  base_timestamp: string
+  target_timestamp: string
+  base_risk_score: number
+  target_risk_score: number
+  score_delta: number
+  base_risk_tier: RiskTier
+  target_risk_tier: RiskTier
+  tier_change: 'IMPROVED' | 'DETERIORATED' | 'UNCHANGED' | string
+  base_policy_action: PolicyAction
+  target_policy_action: PolicyAction
+  action_change: string
+  factor_changes: FactorComparisonItem[]
+  vulnerability_changes: VulnerabilityEvidenceDiff
+  telemetry_changes: Record<string, any>
+  summary_narrative: string
+}
+
+
 

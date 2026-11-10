@@ -51,6 +51,18 @@ class FactorPenalty(BaseModel):
         str,
         Field(description="Insurance loss correlation rationale (e.g. claim frequency/severity impact)"),
     ]
+    evidence_source: Annotated[
+        Optional[str],
+        Field(default="TELEMETRY_SNAPSHOT", description="Source sensor or evidence origin of this control"),
+    ] = "TELEMETRY_SNAPSHOT"
+    evidence_classification: Annotated[
+        Optional[str],
+        Field(default="CONFIRMED", description="Evidence classification: CONFIRMED, POTENTIAL, or UNVERIFIED"),
+    ] = "CONFIRMED"
+    evidence_timestamp: Annotated[
+        Optional[datetime],
+        Field(default=None, description="Observation or sensor timestamp"),
+    ] = None
 
 
 class FinancialExposureEstimate(BaseModel):
@@ -136,8 +148,16 @@ class RiskAssessmentResult(BaseModel):
         datetime,
         Field(default_factory=lambda: datetime.now(timezone.utc)),
     ]
+    organization_ref: Annotated[
+        Optional[str],
+        Field(default=None, description="Associated organization reference in CRGC"),
+    ] = None
     policy_number: Annotated[str, Field(description="Guidewire PolicyCenter policy number")]
     company_name: Annotated[str, Field(description="Insured account legal name")]
+    assessment_type: Annotated[
+        str,
+        Field(default="ON_DEMAND", description="ON_DEMAND, SCHEDULED, or SCENARIO"),
+    ] = "ON_DEMAND"
     base_score: Annotated[float, Field(ge=0.0, le=100.0, description="Inherent baseline risk score")]
     aggregate_risk_score: Annotated[
         float,
@@ -149,6 +169,18 @@ class RiskAssessmentResult(BaseModel):
     ]
     risk_tier: Annotated[RiskTier, Field(description="Actuarial risk classification tier")]
     policy_action: Annotated[PolicyAction, Field(description="Underwriting policy action")]
+    calculation_formula: Annotated[
+        str,
+        Field(default="clamp(5 + MFA + RDP + CVE + EDR, 0, 100) v1.0", description="Actuarial formula version"),
+    ] = "clamp(5 + MFA + RDP + CVE + EDR, 0, 100) v1.0"
+    status: Annotated[
+        str,
+        Field(default="COMPLETED", description="Assessment completion status: COMPLETED or INCOMPLETE_EVIDENCE"),
+    ] = "COMPLETED"
+    previous_assessment_id: Annotated[
+        Optional[str],
+        Field(default=None, description="Reference to previous historical assessment for trend audit"),
+    ] = None
     factor_breakdowns: Annotated[
         list[FactorPenalty],
         Field(description="Itemized, explainable mathematical breakdown of all factor penalties"),
@@ -160,6 +192,10 @@ class RiskAssessmentResult(BaseModel):
     telemetry_summary: Annotated[
         dict[str, Any],
         Field(description="Summary snapshot of the underlying security posture metrics"),
+    ]
+    vulnerability_evidence: Annotated[
+        list[dict[str, Any]],
+        Field(default_factory=list, description="Snapshots of organization-specific vulnerability matches considered"),
     ]
     guidewire_activity_created: Annotated[
         bool,
@@ -187,9 +223,17 @@ class RiskAssessmentResult(BaseModel):
 class AssessmentRequest(BaseModel):
     """Payload to trigger an on-demand risk assessment."""
     policy_number: Annotated[
-        str,
-        Field(description="Target policy number to evaluate", examples=["POL-001"]),
-    ]
+        Optional[str],
+        Field(default=None, description="Target policy number to evaluate", examples=["POL-001"]),
+    ] = None
+    organization_ref: Annotated[
+        Optional[str],
+        Field(default=None, description="Target organization reference to evaluate", examples=["DEMO-ACME-001"]),
+    ] = None
+    telemetry_id: Annotated[
+        Optional[Any],
+        Field(default=None, description="Specific telemetry snapshot ID to evaluate against"),
+    ] = None
     trigger_guidewire_workflow: Annotated[
         bool,
         Field(
@@ -197,3 +241,50 @@ class AssessmentRequest(BaseModel):
             description="Whether to dispatch activities/notes to Guidewire PolicyCenter if thresholds are met",
         ),
     ]
+
+
+class FactorComparisonItem(BaseModel):
+    """Itemized difference between two assessment runs for a specific risk control."""
+    factor_identifier: str
+    factor_name: str
+    base_penalty: float
+    target_penalty: float
+    penalty_delta: float  # target - base
+    direction: str  # INCREASED, DECREASED, UNCHANGED
+    base_observed: Any
+    target_observed: Any
+    explanation: str
+
+
+class VulnerabilityEvidenceDiff(BaseModel):
+    """Diff of vulnerability matches between two assessment runs."""
+    added_cves: list[dict[str, Any]] = Field(default_factory=list)
+    resolved_cves: list[dict[str, Any]] = Field(default_factory=list)
+    persisting_cves: list[dict[str, Any]] = Field(default_factory=list)
+    added_count: int = 0
+    resolved_count: int = 0
+    persisting_count: int = 0
+
+
+class AssessmentComparisonResult(BaseModel):
+    """Comparative posture diff between two historical risk assessments."""
+    base_assessment_id: str
+    target_assessment_id: str
+    organization_ref: str
+    policy_number: str
+    base_timestamp: datetime
+    target_timestamp: datetime
+    base_risk_score: float
+    target_risk_score: float
+    score_delta: float  # target - base
+    base_risk_tier: str
+    target_risk_tier: str
+    tier_change: str  # IMPROVED, DETERIORATED, UNCHANGED
+    base_policy_action: str
+    target_policy_action: str
+    action_change: str
+    factor_changes: list[FactorComparisonItem] = Field(default_factory=list)
+    vulnerability_changes: VulnerabilityEvidenceDiff = Field(default_factory=VulnerabilityEvidenceDiff)
+    telemetry_changes: dict[str, Any] = Field(default_factory=dict)
+    summary_narrative: str
+
