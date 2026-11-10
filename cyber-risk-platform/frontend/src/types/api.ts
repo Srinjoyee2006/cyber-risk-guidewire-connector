@@ -466,3 +466,133 @@ export interface AssessmentComparisonResult {
 
 
 
+
+// =============================================================================
+// Phase 1D: Coverage Engine & Insurance Policy Types
+// =============================================================================
+
+export type CoverageCategory =
+  | 'RANSOMWARE_EXTORTION'
+  | 'DATA_BREACH_PRIVACY'
+  | 'INCIDENT_RESPONSE'
+  | 'BUSINESS_INTERRUPTION'
+  | 'CYBER_CRIME'
+  | 'DATA_RESTORATION'
+  | 'REGULATORY_LEGAL'
+  | 'THIRD_PARTY_LIABILITY'
+
+export type CoverageStatus =
+  | 'COVERED'
+  | 'PARTIALLY_COVERED'
+  | 'EXCLUDED'
+  | 'NOT_DOCUMENTED'
+  | 'REVIEW_REQUIRED'
+
+export type WordingClarity = 'EXPLICIT' | 'AMBIGUOUS' | 'INCOMPLETE'
+
+export type PolicyStatus = 'ACTIVE' | 'EXPIRED' | 'PENDING' | 'CANCELLED'
+
+export interface CoverageSection {
+  section_id?: string
+  category: CoverageCategory
+  coverage_name: string
+  status: CoverageStatus
+  limit_amount?: number | null
+  is_sublimit: boolean
+  deductible_amount?: number | null
+  waiting_period_hours?: number | null
+  coinsurance_pct?: number | null
+  wording_clarity: WordingClarity
+  applicable_exclusions: string[]
+  section_notes?: string | null
+}
+
+export interface InsurancePolicy {
+  policy_id: string
+  organization_id?: string | null
+  organization_ref: string
+  policy_number: string
+  insurer_name: string
+  policy_status: PolicyStatus | string
+  start_date: string
+  expiry_date: string
+  overall_limit: number
+  currency: string
+  retention_deductible: number
+  coinsurance_pct: number
+  waiting_period_hours: number
+  policy_document_ref?: string | null
+  data_source: string
+  conditions_and_endorsements: string[]
+  exclusions: string[]
+  sections: CoverageSection[]
+  created_at: string
+  updated_at: string
+}
+
+export interface CoverageGapFinding {
+  gap_id: string
+  organization_ref: string
+  policy_number: string
+  coverage_category: CoverageCategory
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'ADVISORY' | string
+  gap_title: string
+  explanation: string
+  supporting_policy_term: string
+  supporting_risk_evidence: string
+  recommended_review_action: string
+  created_at: string
+}
+
+export interface HypotheticalLossScenario {
+  scenario_id: string
+  scenario_name: string
+  description: string
+  coverage_category: CoverageCategory
+  estimated_gross_loss: number
+  currency: string
+  coverage_status: CoverageStatus
+  applicable_limit?: number | null
+  applicable_deductible: number
+  applicable_coinsurance_pct: number
+  waiting_period_impact?: string | null
+  estimated_covered_amount?: number | null
+  estimated_insured_retention: number
+  estimated_uncovered_gap: number
+  calculation_explanation: string
+  assumptions_and_limitations: string[]
+}
+
+export interface CategoryEvaluationDetail {
+  category: CoverageCategory
+  category_title: string
+  status: CoverageStatus
+  limit_amount?: number | null
+  is_sublimit: boolean
+  deductible_amount?: number | null
+  waiting_period_hours?: number | null
+  coinsurance_pct?: number | null
+  wording_clarity: WordingClarity
+  relevance_to_risk_posture: string
+  gap_count: number
+  gap_ids: string[]
+  evaluation_notes: string
+}
+
+export interface CoverageEvaluationResponse {
+  evaluation_id: string
+  organization_ref: string
+  policy_number: string
+  assessment_id?: string | null
+  evaluation_timestamp: string
+  policy_status: string
+  overall_gap_count: number
+  critical_gap_count: number
+  summary: Record<string, any>
+  policy_snapshot: Record<string, any>
+  risk_assessment_snapshot: Record<string, any>
+  category_evaluations: CategoryEvaluationDetail[]
+  coverage_gaps: CoverageGapFinding[]
+  hypothetical_loss_scenarios: HypotheticalLossScenario[]
+  governance_notice: string
+}

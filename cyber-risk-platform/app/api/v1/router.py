@@ -14,6 +14,8 @@ from app.api.v1.overview import router as overview_router
 from app.api.v1.organizations import router as organizations_router
 from app.api.v1.assets import router as assets_router
 from app.api.v1.observations import router as observations_router
+from app.api.v1.policies import router as policies_router
+from app.api.v1.coverage import router as coverage_router
 
 api_v1_router = APIRouter(prefix="/v1")
 
@@ -28,4 +30,5 @@ api_v1_router.include_router(overview_router)
 api_v1_router.include_router(organizations_router)
 api_v1_router.include_router(assets_router)
 api_v1_router.include_router(observations_router)
-
+api_v1_router.include_router(policies_router)
+api_v1_router.include_router(coverage_router)

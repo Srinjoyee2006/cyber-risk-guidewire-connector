@@ -11,6 +11,7 @@ import {
   Search,
   Eye,
   Activity,
+  FileText,
 } from 'lucide-react'
 import { apiClient } from '../services/apiClient'
 import type {
@@ -25,6 +26,7 @@ import type {
 import { PriorityBadge, KevBadge, CvssBadge, EvidenceBadge } from '../components/Badges'
 import { MatchInspectionModal } from '../components/MatchInspectionModal'
 import { OrganizationAssessmentsSection } from '../components/OrganizationAssessmentsSection'
+import { OrganizationCoverageSection } from '../components/OrganizationCoverageSection'
 
 export const OrganizationsPage: React.FC = () => {
   const [organizations, setOrganizations] = useState<OrganizationResponse[]>([])
@@ -41,7 +43,7 @@ export const OrganizationsPage: React.FC = () => {
   const [selectedMatch, setSelectedMatch] = useState<VulnerabilityMatchRecord | null>(null)
 
   // Navigation tab for organization details
-  const [orgTab, setOrgTab] = useState<'ASSETS' | 'MATCHES' | 'ASSESSMENTS' | 'IMPORT'>('ASSETS')
+  const [orgTab, setOrgTab] = useState<'ASSETS' | 'MATCHES' | 'ASSESSMENTS' | 'COVERAGE' | 'IMPORT'>('ASSETS')
 
   // Filters for matches tab
   const [searchQuery, setSearchQuery] = useState('')
@@ -424,6 +426,17 @@ export const OrganizationsPage: React.FC = () => {
                   Assessments & History
                 </button>
                 <button
+                  onClick={() => setOrgTab('COVERAGE')}
+                  className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${
+                    orgTab === 'COVERAGE'
+                      ? 'border-indigo-500 text-indigo-400'
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Policy & Coverage Engine
+                </button>
+                <button
                   onClick={() => setOrgTab('ASSETS')}
                   className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${
                     orgTab === 'ASSETS'
@@ -761,6 +774,11 @@ export const OrganizationsPage: React.FC = () => {
               {/* TAB 4: RISK ASSESSMENTS & TELEMETRY HISTORY (Phase 1B) */}
               {orgTab === 'ASSESSMENTS' && (
                 <OrganizationAssessmentsSection organization={selectedOrg} />
+              )}
+
+              {/* TAB 5: INSURANCE POLICY & COVERAGE GAP ENGINE (Phase 1D) */}
+              {orgTab === 'COVERAGE' && (
+                <OrganizationCoverageSection organization={selectedOrg} />
               )}
             </>
           ) : (

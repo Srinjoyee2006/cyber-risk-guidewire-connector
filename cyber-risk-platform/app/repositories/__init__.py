@@ -12,6 +12,8 @@ from app.repositories.asset_repository import AssetRepository
 from app.repositories.observation_repository import ObservationRepository
 from app.repositories.telemetry_repository import TelemetryRepository
 from app.repositories.assessment_repository import AssessmentRepository
+from app.repositories.policy_repository import PolicyRepository
+from app.repositories.coverage_evaluation_repository import CoverageEvaluationRepository
 
 __all__ = [
     "IngestionRepository",
@@ -23,5 +25,7 @@ __all__ = [
     "ObservationRepository",
     "TelemetryRepository",
     "AssessmentRepository",
+    "PolicyRepository",
+    "CoverageEvaluationRepository",
 ]
 

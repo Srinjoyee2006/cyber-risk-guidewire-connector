@@ -246,5 +246,47 @@ export const apiClient = {
       `/api/v1/assessments/compare?base_id=${encodeURIComponent(baseId)}&target_id=${encodeURIComponent(targetId)}`
     )
   },
+
+  // Phase 1D: Policies & Coverage Engine
+  getOrganizationPolicies: (orgRef: string): Promise<import('../types/api').InsurancePolicy[]> => {
+    return fetchJson<import('../types/api').InsurancePolicy[]>(`/api/v1/policies/organization/${encodeURIComponent(orgRef)}`)
+  },
+
+  getPolicyById: (policyId: string): Promise<import('../types/api').InsurancePolicy> => {
+    return fetchJson<import('../types/api').InsurancePolicy>(`/api/v1/policies/${encodeURIComponent(policyId)}`)
+  },
+
+  getLatestCoverageEvaluation: (orgRef: string): Promise<import('../types/api').CoverageEvaluationResponse> => {
+    return fetchJson<import('../types/api').CoverageEvaluationResponse>(`/api/v1/coverage/latest/${encodeURIComponent(orgRef)}`)
+  },
+
+  getCoverageEvaluationHistory: (orgRef: string, limit = 20): Promise<import('../types/api').CoverageEvaluationResponse[]> => {
+    return fetchJson<import('../types/api').CoverageEvaluationResponse[]>(`/api/v1/coverage/history/${encodeURIComponent(orgRef)}?limit=${limit}`)
+  },
+
+  getActiveCoverageGaps: (orgRef: string): Promise<import('../types/api').CoverageGapFinding[]> => {
+    return fetchJson<import('../types/api').CoverageGapFinding[]>(`/api/v1/coverage/gaps/${encodeURIComponent(orgRef)}`)
+  },
+
+  evaluateCoverage: (orgRef: string, policyNumber?: string): Promise<import('../types/api').CoverageEvaluationResponse> => {
+    return fetchJson<import('../types/api').CoverageEvaluationResponse>(`/api/v1/coverage/evaluate`, {
+      method: 'POST',
+      body: JSON.stringify({
+        organization_ref: orgRef,
+        policy_number: policyNumber,
+      }),
+    })
+  },
+
+  simulateHypotheticalScenarios: (policyId: string, customLoss?: number, customCategory?: string): Promise<import('../types/api').HypotheticalLossScenario[]> => {
+    return fetchJson<import('../types/api').HypotheticalLossScenario[]>(`/api/v1/coverage/hypothetical-scenarios`, {
+      method: 'POST',
+      body: JSON.stringify({
+        policy_id: policyId,
+        custom_gross_loss: customLoss,
+        custom_category: customCategory,
+      }),
+    })
+  },
 }
 

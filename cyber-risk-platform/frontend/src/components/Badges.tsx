@@ -172,3 +172,70 @@ export const PolicyActionBadge: React.FC<{ action: string }> = ({ action }) => {
 }
 
 
+
+export const CoverageStatusBadge: React.FC<{ status: string }> = ({ status }) => {
+  const s = (status || '').toUpperCase()
+  let color = 'bg-slate-800 text-slate-300 border-slate-700'
+  let label = s
+
+  if (s === 'COVERED') {
+    color = 'bg-emerald-950/80 text-emerald-300 border-emerald-700/60'
+    label = 'COVERED'
+  } else if (s === 'PARTIALLY_COVERED') {
+    color = 'bg-cyan-950/80 text-cyan-300 border-cyan-700/60'
+    label = 'PARTIALLY COVERED'
+  } else if (s === 'EXCLUDED') {
+    color = 'bg-rose-950/80 text-rose-300 border-rose-700/60 ring-1 ring-rose-500/20'
+    label = 'EXCLUDED'
+  } else if (s === 'REVIEW_REQUIRED') {
+    color = 'bg-amber-950/80 text-amber-300 border-amber-700/60 ring-1 ring-amber-500/20'
+    label = 'REVIEW REQUIRED'
+  } else if (s === 'NOT_DOCUMENTED') {
+    color = 'bg-slate-900/90 text-slate-400 border-slate-700/60'
+    label = 'NOT DOCUMENTED'
+  }
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-xs font-bold border ${color}`}>
+      <span>{label}</span>
+    </span>
+  )
+}
+
+export const WordingClarityBadge: React.FC<{ clarity: string }> = ({ clarity }) => {
+  const c = (clarity || '').toUpperCase()
+  let color = 'bg-slate-800 text-slate-400 border-slate-700'
+  if (c === 'EXPLICIT') {
+    color = 'bg-emerald-950/60 text-emerald-300 border-emerald-800/40'
+  } else if (c === 'AMBIGUOUS') {
+    color = 'bg-amber-950/60 text-amber-300 border-amber-800/50'
+  } else if (c === 'INCOMPLETE') {
+    color = 'bg-rose-950/60 text-rose-300 border-rose-800/50'
+  }
+
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border ${color}`}>
+      {c}
+    </span>
+  )
+}
+
+export const GapSeverityBadge: React.FC<{ severity: string }> = ({ severity }) => {
+  const s = (severity || '').toUpperCase()
+  let color = 'bg-slate-800 text-slate-300 border-slate-700'
+  if (s === 'CRITICAL') {
+    color = 'bg-rose-950/90 text-rose-300 border-rose-700/70 ring-1 ring-rose-500/30'
+  } else if (s === 'HIGH') {
+    color = 'bg-orange-950/90 text-orange-300 border-orange-700/70'
+  } else if (s === 'MEDIUM') {
+    color = 'bg-amber-950/80 text-amber-300 border-amber-700/60'
+  } else if (s === 'LOW' || s === 'ADVISORY') {
+    color = 'bg-blue-950/80 text-blue-300 border-blue-700/60'
+  }
+
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border ${color}`}>
+      {s}
+    </span>
+  )
+}

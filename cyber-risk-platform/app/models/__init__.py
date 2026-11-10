@@ -16,6 +16,11 @@ from app.models.assessment import (
     AssessmentFactorBreakdownModel,
     AssessmentEvidenceSnapshotModel,
 )
+from app.models.policy import (
+    InsurancePolicyModel,
+    PolicyCoverageSectionModel,
+    CoverageEvaluationModel,
+)
 
 __all__ = [
     "DataIngestionRun",
@@ -30,5 +35,8 @@ __all__ = [
     "RiskAssessmentModel",
     "AssessmentFactorBreakdownModel",
     "AssessmentEvidenceSnapshotModel",
+    "InsurancePolicyModel",
+    "PolicyCoverageSectionModel",
+    "CoverageEvaluationModel",
 ]
 
