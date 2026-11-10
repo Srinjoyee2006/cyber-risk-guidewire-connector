@@ -5,12 +5,15 @@ CISA Known Exploited Vulnerabilities (KEV) Catalog Client & Normalizer
 
 from datetime import date, datetime, timezone
 import logging
+import re
 from typing import Any, Optional
 import httpx
 
 from config.settings import Settings, get_settings
 
 logger = logging.getLogger("crgc.services.kev_client")
+
+CVE_ID_PATTERN = re.compile(r"^CVE-\d{4}-\d{4,}$", re.IGNORECASE)
 
 
 class CisaKevClientError(Exception):
@@ -48,7 +51,11 @@ def parse_kev_entry(entry: dict[str, Any], source_url: str) -> dict[str, Any]:
     Normalize a single raw CISA KEV catalog vulnerability entry into model attributes.
     Preserves original KEV item dictionary in 'raw_payload'.
     """
-    cve_id = entry.get("cveID", "").strip()
+    raw_cve_id = entry.get("cveID")
+    cve_id = raw_cve_id.strip().upper() if isinstance(raw_cve_id, str) else ""
+    if not CVE_ID_PATTERN.fullmatch(cve_id):
+        raise ValueError(f"Invalid or missing CISA KEV cveID: {raw_cve_id!r}")
+
     return {
         "cve_id": cve_id,
         "vulnerability_name": entry.get("vulnerabilityName"),

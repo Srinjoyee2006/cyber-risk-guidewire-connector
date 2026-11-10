@@ -86,6 +86,20 @@ class TestKevParser:
         assert parsed["raw_payload"]["cveID"] == "CVE-2024-38077"
 
 
+    @pytest.mark.parametrize("bad_cve_id", [None, "", "not-a-cve", "CVE-24-1234"])
+    def test_parse_kev_entry_rejects_missing_or_invalid_cve_id(self, bad_cve_id):
+        with pytest.raises(ValueError, match="Invalid or missing CISA KEV cveID"):
+            parse_kev_entry({"cveID": bad_cve_id}, source_url="https://example.com/kev.json")
+
+
+    def test_parse_kev_entry_normalizes_cve_id(self):
+        parsed = parse_kev_entry(
+            {"cveID": "cve-2024-38077"},
+            source_url="https://example.com/kev.json",
+        )
+        assert parsed["cve_id"] == "CVE-2024-38077"
+
+
 class TestKevIngestionService:
     """Verifies KEV ingestion matching, unmatched handling, idempotency, and repository updates."""
 
