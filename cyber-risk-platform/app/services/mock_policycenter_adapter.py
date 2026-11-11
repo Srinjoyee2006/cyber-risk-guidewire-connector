@@ -212,18 +212,7 @@ class MockPolicyCenterAdapter:
         """Retrieves details of a previously generated simulated Guidewire activity."""
         data = self._simulated_activities.get(activity_id)
         if not data:
-            # Generate deterministic fallback if queried directly
-            return SimulatedPolicyCenterActivityResponse(
-                activity_id=activity_id,
-                activity_pattern="underwriter_review",
-                subject=f"Simulated Activity for {activity_id}",
-                priority="urgent",
-                status="Open",
-                target_date=(datetime.now(timezone.utc) + timedelta(days=2)).isoformat(),
-                policy_number="POL-DEMO",
-                insured_name="Insured Organization",
-                simulated_policycenter_url=f"{self.base_url}/activities/{activity_id}",
-            )
+            return None
 
         return SimulatedPolicyCenterActivityResponse(
             activity_id=data["activity_id"],

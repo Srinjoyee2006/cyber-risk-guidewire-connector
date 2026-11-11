@@ -5,10 +5,20 @@ Database Session & Engine Management
 
 from collections.abc import Generator
 from typing import Any
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker, Session
 
 from config.settings import get_settings
+
+
+@event.listens_for(Engine, "connect")
+def _set_sqlite_pragma(dbapi_connection: Any, connection_record: Any) -> None:
+    """Enforces SQLite foreign key constraints for every connection."""
+    if dbapi_connection.__class__.__module__.startswith("sqlite3"):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 
 def create_db_engine(db_url: str | None = None, echo: bool | None = None):

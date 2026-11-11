@@ -331,6 +331,23 @@ def test_08_successful_mock_dispatch(client: TestClient, authorized_org: Organiz
     assert history[0]["dispatch_status"] == "SUCCESS"
     assert history[0]["simulated_policycenter_id"] == data["guidewire_activity_id"]
 
+    # Verify valid activity ID returns HTTP 200 with complete activity attributes
+    act_resp = client.get(f"/api/v1/underwriting/activities/{data['guidewire_activity_id']}")
+    assert act_resp.status_code == 200
+    act_data = act_resp.json()
+    assert act_data["activity_id"] == data["guidewire_activity_id"]
+    assert act_data["is_simulated"] is True
+    assert "guidewire://" in act_data["simulated_policycenter_url"] or "http" in act_data["simulated_policycenter_url"]
+
+
+# =============================================================================
+# Test 8b: Unknown simulated activity ID returns 404
+# =============================================================================
+def test_08b_unknown_simulated_activity_returns_404(client: TestClient):
+    resp = client.get("/api/v1/underwriting/activities/pc:act_UNKNOWN_999999")
+    assert resp.status_code == 404
+    assert "not found" in resp.json()["detail"].lower()
+
 
 # =============================================================================
 # Test 9: Failed mock dispatch simulation and error logging
