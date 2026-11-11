@@ -21,6 +21,11 @@ from app.models.policy import (
     PolicyCoverageSectionModel,
     CoverageEvaluationModel,
 )
+from app.models.underwriting import (
+    UnderwritingReviewModel,
+    UnderwritingDispatchAttemptModel,
+    UnderwritingStatusHistoryModel,
+)
 
 __all__ = [
     "DataIngestionRun",
@@ -38,5 +43,8 @@ __all__ = [
     "InsurancePolicyModel",
     "PolicyCoverageSectionModel",
     "CoverageEvaluationModel",
+    "UnderwritingReviewModel",
+    "UnderwritingDispatchAttemptModel",
+    "UnderwritingStatusHistoryModel",
 ]
 

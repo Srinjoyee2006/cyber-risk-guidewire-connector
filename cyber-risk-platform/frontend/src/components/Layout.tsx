@@ -1,6 +1,6 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
-import { ShieldCheck, Search, Database, BarChart3 } from 'lucide-react'
+import { ShieldCheck, Search, Database, BarChart3, FileCheck } from 'lucide-react'
 import { BoundaryNotice } from './BoundaryNotice'
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -95,6 +95,20 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             >
               <Search className="w-4 h-4 text-purple-400" />
               Observed Vulns
+            </NavLink>
+
+            <NavLink
+              to="/underwriting"
+              className={({ isActive }) =>
+                `flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  isActive
+                    ? 'bg-slate-800 text-purple-300 border border-slate-700 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`
+              }
+            >
+              <FileCheck className="w-4 h-4 text-indigo-400" />
+              Underwriting
             </NavLink>
           </nav>
         </div>

@@ -288,5 +288,119 @@ export const apiClient = {
       }),
     })
   },
+
+  // Phase 1E: Underwriting Workflow & PolicyCenter Integration
+  triggerUnderwritingReview: (req: import('../types/api').UnderwritingReviewCreateRequest): Promise<import('../types/api').UnderwritingReview> => {
+    return fetchJson<import('../types/api').UnderwritingReview>(`/api/v1/underwriting/reviews`, {
+      method: 'POST',
+      body: JSON.stringify(req),
+    })
+  },
+
+  createUnderwritingReview: (req: import('../types/api').UnderwritingReviewCreateRequest): Promise<import('../types/api').UnderwritingReview> => {
+    return fetchJson<import('../types/api').UnderwritingReview>(`/api/v1/underwriting/reviews`, {
+      method: 'POST',
+      body: JSON.stringify(req),
+    })
+  },
+
+  getUnderwritingReview: (reviewId: string): Promise<import('../types/api').UnderwritingReview> => {
+    return fetchJson<import('../types/api').UnderwritingReview>(`/api/v1/underwriting/reviews/${encodeURIComponent(reviewId)}`)
+  },
+
+  listOrganizationUnderwritingReviews: (
+    orgRef: string,
+    status?: string,
+    limit = 50,
+    offset = 0
+  ): Promise<import('../types/api').UnderwritingReview[]> => {
+    const params = new URLSearchParams()
+    if (status) params.append('status', status)
+    params.append('limit', limit.toString())
+    params.append('offset', offset.toString())
+    return fetchJson<import('../types/api').UnderwritingReview[]>(
+      `/api/v1/underwriting/reviews/organization/${encodeURIComponent(orgRef)}?${params.toString()}`
+    )
+  },
+
+  listAllUnderwritingReviews: (
+    status?: string,
+    search?: string,
+    limit = 50,
+    offset = 0
+  ): Promise<import('../types/api').UnderwritingReview[]> => {
+    const params = new URLSearchParams()
+    if (status) params.append('status', status)
+    if (search) params.append('search', search)
+    params.append('limit', limit.toString())
+    params.append('offset', offset.toString())
+    return fetchJson<import('../types/api').UnderwritingReview[]>(
+      `/api/v1/underwriting/reviews?${params.toString()}`
+    )
+  },
+
+  dispatchUnderwritingReview: (
+    reviewId: string,
+    req?: import('../types/api').UnderwritingDispatchRequest
+  ): Promise<import('../types/api').UnderwritingReview> => {
+    return fetchJson<import('../types/api').UnderwritingReview>(
+      `/api/v1/underwriting/reviews/${encodeURIComponent(reviewId)}/dispatch`,
+      {
+        method: 'POST',
+        body: JSON.stringify(req || {}),
+      }
+    )
+  },
+
+  retryUnderwritingDispatch: (
+    reviewId: string,
+    req?: import('../types/api').UnderwritingDispatchRequest
+  ): Promise<import('../types/api').UnderwritingReview> => {
+    return fetchJson<import('../types/api').UnderwritingReview>(
+      `/api/v1/underwriting/reviews/${encodeURIComponent(reviewId)}/retry`,
+      {
+        method: 'POST',
+        body: JSON.stringify(req || {}),
+      }
+    )
+  },
+
+  transitionUnderwritingStatus: (
+    reviewId: string,
+    req: import('../types/api').UnderwritingStatusTransitionRequest
+  ): Promise<import('../types/api').UnderwritingReview> => {
+    return fetchJson<import('../types/api').UnderwritingReview>(
+      `/api/v1/underwriting/reviews/${encodeURIComponent(reviewId)}/status`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(req),
+      }
+    )
+  },
+
+  getUnderwritingDispatchHistory: (
+    reviewId: string
+  ): Promise<import('../types/api').UnderwritingDispatchAttempt[]> => {
+    return fetchJson<import('../types/api').UnderwritingDispatchAttempt[]>(
+      `/api/v1/underwriting/reviews/${encodeURIComponent(reviewId)}/dispatch-history`
+    )
+  },
+
+  getSimulatedPolicyCenterActivity: (
+    activityId: string
+  ): Promise<import('../types/api').SimulatedPolicyCenterActivity> => {
+    return fetchJson<import('../types/api').SimulatedPolicyCenterActivity>(
+      `/api/v1/underwriting/activities/${encodeURIComponent(activityId)}`
+    )
+  },
+
+  getUnderwritingDashboardMetrics: (
+    orgRef?: string
+  ): Promise<import('../types/api').UnderwritingDashboardMetrics> => {
+    const url = orgRef
+      ? `/api/v1/underwriting/dashboard/${encodeURIComponent(orgRef)}`
+      : `/api/v1/underwriting/dashboard`
+    return fetchJson<import('../types/api').UnderwritingDashboardMetrics>(url)
+  },
 }
 

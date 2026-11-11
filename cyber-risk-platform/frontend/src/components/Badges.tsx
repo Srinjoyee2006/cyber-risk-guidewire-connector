@@ -241,3 +241,70 @@ export const GapSeverityBadge: React.FC<{ severity: string }> = ({ severity }) =
     </span>
   )
 }
+
+export const ReviewStatusBadge: React.FC<{ status: string }> = ({ status }) => {
+  const s = (status || '').toUpperCase()
+  let color = 'bg-slate-800 text-slate-300 border-slate-700'
+  let label = s.replace(/_/g, ' ')
+
+  if (s === 'PENDING') {
+    color = 'bg-amber-950/80 text-amber-300 border-amber-700/70 ring-1 ring-amber-500/20'
+    label = 'PENDING'
+  } else if (s === 'DISPATCHED') {
+    color = 'bg-blue-950/80 text-blue-300 border-blue-700/70 ring-1 ring-blue-500/20'
+    label = 'DISPATCHED'
+  } else if (s === 'IN_PROGRESS' || s === 'IN_REVIEW' || s === 'ACKNOWLEDGED') {
+    color = 'bg-indigo-950/80 text-indigo-300 border-indigo-700/70 ring-1 ring-indigo-500/20'
+    label = s === 'IN_REVIEW' ? 'IN REVIEW' : s === 'ACKNOWLEDGED' ? 'ACKNOWLEDGED' : 'IN PROGRESS'
+  } else if (s === 'INFO_REQUESTED' || s === 'INFORMATION_REQUESTED') {
+    color = 'bg-sky-950/80 text-sky-300 border-sky-700/70'
+    label = 'INFO REQUESTED'
+  } else if (s === 'APPROVED') {
+    color = 'bg-emerald-950/80 text-emerald-300 border-emerald-700/70 ring-1 ring-emerald-500/30'
+    label = 'APPROVED'
+  } else if (s === 'DECLINED') {
+    color = 'bg-rose-950/80 text-rose-300 border-rose-700/70 ring-1 ring-rose-500/30'
+    label = 'DECLINED'
+  } else if (s === 'FAILED') {
+    color = 'bg-red-950/90 text-red-300 border-red-700/80 ring-1 ring-red-500/40'
+    label = 'FAILED'
+  } else if (s === 'EXPIRED' || s === 'CLOSED') {
+    color = 'bg-slate-900/90 text-slate-400 border-slate-700/60'
+    label = s
+  }
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-xs font-bold border ${color}`}>
+      <span>{label}</span>
+    </span>
+  )
+}
+
+export const RecommendedActionBadge: React.FC<{ action: string }> = ({ action }) => {
+  const a = (action || '').toUpperCase()
+  let color = 'bg-slate-800 text-slate-300 border-slate-700'
+  let label = a.replace(/_/g, ' ')
+
+  if (a === 'APPROVE_AS_IS' || a === 'NO_ACTION_REQUIRED') {
+    color = 'bg-emerald-950/80 text-emerald-300 border-emerald-700/70'
+    label = a === 'NO_ACTION_REQUIRED' ? 'NO ACTION REQUIRED' : 'APPROVE AS-IS'
+  } else if (a === 'REFER_TO_SENIOR' || a === 'MONITOR') {
+    color = 'bg-amber-950/80 text-amber-300 border-amber-700/70'
+    label = a === 'MONITOR' ? 'MONITOR RISK' : 'REFER TO SENIOR'
+  } else if (a === 'SPECIAL_TERMS_EXCLUSION' || a === 'UNDERWRITER_REVIEW') {
+    color = 'bg-orange-950/80 text-orange-300 border-orange-700/70'
+    label = a === 'UNDERWRITER_REVIEW' ? 'UNDERWRITER REVIEW' : 'SPECIAL TERMS / EXCLUSION'
+  } else if (a === 'DECLINE' || a === 'URGENT_UNDERWRITER_REVIEW') {
+    color = 'bg-rose-950/80 text-rose-300 border-rose-700/70 ring-1 ring-rose-500/20'
+    label = a === 'URGENT_UNDERWRITER_REVIEW' ? 'URGENT UW REVIEW' : 'DECLINE'
+  } else if (a === 'REQUEST_MORE_INFO' || a === 'REQUEST_INFORMATION') {
+    color = 'bg-sky-950/80 text-sky-300 border-sky-700/70'
+    label = 'REQUEST INFO'
+  }
+
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold border ${color}`}>
+      {label}
+    </span>
+  )
+}

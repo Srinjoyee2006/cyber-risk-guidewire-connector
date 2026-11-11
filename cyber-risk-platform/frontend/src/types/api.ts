@@ -596,3 +596,129 @@ export interface CoverageEvaluationResponse {
   hypothetical_loss_scenarios: HypotheticalLossScenario[]
   governance_notice: string
 }
+
+// =============================================================================
+// Phase 1E: Underwriting Workflow & PolicyCenter Integration Types
+// =============================================================================
+
+export type UnderwritingReviewStatus =
+  | 'PENDING'
+  | 'DISPATCHED'
+  | 'ACKNOWLEDGED'
+  | 'IN_REVIEW'
+  | 'INFORMATION_REQUESTED'
+  | 'APPROVED'
+  | 'DECLINED'
+  | 'CLOSED'
+  | 'FAILED'
+
+export type RecommendedUnderwritingAction =
+  | 'NO_ACTION_REQUIRED'
+  | 'MONITOR'
+  | 'REQUEST_INFORMATION'
+  | 'UNDERWRITER_REVIEW'
+  | 'URGENT_UNDERWRITER_REVIEW'
+
+export type ReviewTriggerCategory =
+  | 'RISK_INCREASE'
+  | 'TIER_CHANGE'
+  | 'CRITICAL_VULNERABILITY'
+  | 'UNRESOLVED_KEV'
+  | 'CRITICAL_COVERAGE_GAP'
+  | 'POLICY_EXPIRY'
+  | 'MANUAL_REQUEST'
+
+export interface UnderwritingDispatchAttempt {
+  attempt_id: string
+  review_id: string
+  dispatch_timestamp: string
+  dispatch_status: 'SUCCESS' | 'FAILED'
+  simulated_policycenter_id?: string | null
+  request_payload_json: Record<string, any>
+  response_payload_json: Record<string, any>
+  error_message?: string | null
+}
+
+export interface UnderwritingStatusHistory {
+  history_id: string
+  review_id: string
+  previous_status: string
+  new_status: string
+  actor: string
+  comment?: string | null
+  created_at: string
+}
+
+export interface UnderwritingReview {
+  review_id: string
+  organization_id?: string | null
+  organization_ref: string
+  organization_name: string
+  policy_id?: string | null
+  policy_number: string
+  assessment_id?: string | null
+  coverage_evaluation_id?: string | null
+  status: UnderwritingReviewStatus
+  previous_risk_score?: number | null
+  current_risk_score: number
+  score_change: number
+  risk_tier: string
+  policy_action: string
+  trigger_category: ReviewTriggerCategory
+  trigger_reason: string
+  recommended_action: RecommendedUnderwritingAction
+  recommendation_explanation: string
+  guidewire_activity_id?: string | null
+  guidewire_activity_priority: string
+  evidence_snapshot: Record<string, any>
+  created_at: string
+  updated_at: string
+  dispatch_attempts: UnderwritingDispatchAttempt[]
+  status_history: UnderwritingStatusHistory[]
+  governance_notice: string
+}
+
+export interface UnderwritingDashboardMetrics {
+  total_reviews: number
+  pending_reviews: number
+  dispatched_reviews: number
+  in_progress_reviews: number
+  completed_reviews: number
+  failed_dispatches: number
+  critical_reviews: number
+  governance_notice: string
+}
+
+export interface SimulatedPolicyCenterActivity {
+  activity_id: string
+  activity_pattern: string
+  subject: string
+  priority: string
+  status: string
+  target_date: string
+  policy_number: string
+  insured_name: string
+  is_simulated: boolean
+  simulated_policycenter_url: string
+  governance_notice: string
+}
+
+export interface UnderwritingReviewCreateRequest {
+  organization_ref: string
+  policy_id?: string | null
+  trigger_reason?: string | null
+  notes?: string | null
+  force_new?: boolean
+}
+
+export interface UnderwritingStatusTransitionRequest {
+  new_status: UnderwritingReviewStatus
+  actor?: string
+  comment?: string | null
+}
+
+export interface UnderwritingDispatchRequest {
+  simulate_failure?: boolean
+  custom_notes?: string | null
+}
+

@@ -16,6 +16,7 @@ from app.api.v1.assets import router as assets_router
 from app.api.v1.observations import router as observations_router
 from app.api.v1.policies import router as policies_router
 from app.api.v1.coverage import router as coverage_router
+from app.api.v1.underwriting import router as underwriting_router
 
 api_v1_router = APIRouter(prefix="/v1")
 
@@ -32,3 +33,4 @@ api_v1_router.include_router(assets_router)
 api_v1_router.include_router(observations_router)
 api_v1_router.include_router(policies_router)
 api_v1_router.include_router(coverage_router)
+api_v1_router.include_router(underwriting_router)
