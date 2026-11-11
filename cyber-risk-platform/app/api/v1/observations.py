@@ -11,6 +11,8 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from config.settings import Settings, get_settings
+from app.core.security import get_current_user, UserProfile
 from app.db.session import get_db
 from app.models.observation import VulnerabilityObservation
 from app.models.vulnerability import Vulnerability
@@ -45,16 +47,34 @@ async def import_observations(
     file: Optional[UploadFile] = File(None),
     json_payload: Optional[ObservationJsonImportRequest] = None,
     db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+    current_user: UserProfile = Depends(get_current_user),
 ) -> ObservationImportResponse:
     service = AssetObservationService(db)
+    max_bytes = settings.max_csv_upload_bytes
 
     target_org_ref = organization_ref
     csv_text = ""
 
     if file is not None:
-        content_bytes = await file.read()
+        if file.filename and not file.filename.lower().endswith(".csv"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid file extension for '{file.filename}'. Only .csv files are permitted.",
+            )
+        content_bytes = await file.read(max_bytes + 1)
+        if len(content_bytes) > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"Uploaded file exceeds the maximum allowed limit of {max_bytes // (1024 * 1024)} MB.",
+            )
         csv_text = content_bytes.decode("utf-8-sig", errors="replace")
     elif json_payload is not None:
+        if len(json_payload.csv_data.encode("utf-8")) > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"CSV payload exceeds the maximum allowed limit of {max_bytes // (1024 * 1024)} MB.",
+            )
         target_org_ref = json_payload.organization_ref
         csv_text = json_payload.csv_data
     else:
@@ -89,6 +109,14 @@ def get_organization_observations(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Organization with ref '{organization_ref}' was not found.",
+        )
+    if not org.is_authorized():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Organization '{org.organization_ref}' data authorization status is '{org.data_authorization_status}'. "
+                "Access is forbidden unless authorization status is 'GRANTED'."
+            ),
         )
 
     obs_repo = ObservationRepository(db)

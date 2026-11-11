@@ -17,10 +17,12 @@ from app.api.v1.observations import router as observations_router
 from app.api.v1.policies import router as policies_router
 from app.api.v1.coverage import router as coverage_router
 from app.api.v1.underwriting import router as underwriting_router
+from app.api.v1.auth import router as auth_router
 
 api_v1_router = APIRouter(prefix="/v1")
 
 # Mount modular sub-routers
+api_v1_router.include_router(auth_router)
 api_v1_router.include_router(telemetry_router)
 api_v1_router.include_router(assessments_router)
 api_v1_router.include_router(ingestion_router)

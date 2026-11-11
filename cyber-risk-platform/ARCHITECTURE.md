@@ -1,311 +1,166 @@
 # Architecture & System Design: CyberRisk-Guidewire-Connector (CRGC)
 
-## 1. Business Positioning & Purpose
+## 1. Business Positioning & Governance Boundaries
 
-**CyberRisk-Guidewire-Connector (CRGC)** operates as an enterprise Cyber Vulnerability Intelligence, Prioritization, and Underwriting Advisory Service designed to bridge public vulnerability intelligence feeds with commercial cyber insurance underwriting workflows.
+**CyberRisk-Guidewire-Connector (CRGC)** is a Cyber Vulnerability Intelligence, Deterministic Risk Scoring, Policy Coverage Gap Analysis, and Simulated Guidewire PolicyCenter Underwriting Advisory Platform.
 
-### System Boundaries & Guarantees
-* **Guidewire PolicyCenter as System of Record**: Guidewire PolicyCenter (v10.2.1) remains the sole authoritative system of record for policy terms, coverages, endorsements, and policy status.
-* **Advisory Recommendations Only**: CRGC evaluates security posture and provides decision-support recommendations to underwriters.
-* **Strict Non-Automated Policy Binding**: CRGC **never** automatically binds, changes, cancels, or reprices policies. All policy modifications require human underwriter adjudication and explicit endorsement issuance within PolicyCenter.
-* **Vulnerability Intelligence vs. Insured Exposure Distinction**: Real-world vulnerability feeds (NVD and CISA KEV) provide empirical data regarding vulnerability severity, weaponization, and exploitability. However, public feeds do NOT indicate whether a specific insured organization has that software deployed. Therefore, the vulnerability intelligence layer exclusively ingests and normalizes public vulnerability data without unilaterally computing an insured company's overall risk score.
+### Core Governance & Simulation Guarantees
+* **Guidewire PolicyCenter as System of Record**: In target insurance operations, Guidewire PolicyCenter (v10.2.1) is treated as the authoritative system of record for policy terms, coverages, endorsements, and policy status. In this local prototype, all PolicyCenter interactions run strictly against [MockPolicyCenterAdapter](file:///d:/New%20folder/cyber-risk-platform/app/services/mock_policycenter_adapter.py) and [GuidewireClient](file:///d:/New%20folder/cyber-risk-platform/app/services/guidewire_client.py) (`GW_MOCK_MODE=true`), with no live PolicyCenter instance connected.
+* **Advisory Recommendations Only**: CRGC operates purely as a decision-support service. It never automatically binds, modifies, endorses, reprices, or cancels real insurance policies. `APPROVED` and `DECLINED` transitions require explicit human/simulated underwriter actions enforced by [underwriting_state_machine.py](file:///d:/New%20folder/cyber-risk-platform/app/core/underwriting_state_machine.py).
+* **Deterministic Engineering Rules (Non-Actuarial)**: Vulnerability prioritization (`P1–P4`) and organizational scoring ([RiskEngine](file:///d:/New%20folder/cyber-risk-platform/app/core/risk_engine.py)) use transparent, rule-based engineering benchmarks—not empirically calibrated actuarial loss models or black-box ML.
+* **Coverage Analysis Boundary**: Coverage gap evaluations and simplified hypothetical loss scenarios ([CoverageEngine](file:///d:/New%20folder/cyber-risk-platform/app/core/coverage_engine.py)) are analytical aids, not legal policy interpretation or binding claims adjudication.
+* **Public Feeds vs. Insured Exposure**: Public NVD/CISA KEV feeds do not establish organizational impact until reconciled against authorized organization assets and scanner observations (`data_authorization_status == GRANTED`). Missing evidence is tracked distinctly from healthy security posture.
 
 ---
 
 ## 2. Component Architecture Overview
 
-CRGC follows a clean modular architecture separating routing, schemas, repositories, actuarial engines, services, and configuration:
-
-```
+```text
 cyber-risk-platform/
-├── alembic/                     # Database migrations
-│   ├── versions/                # Versioned migration scripts
-│   └── env.py                   # Migration environment & engine configuration
+├── alembic/                                 # Database schema migrations (head: b282299087ec)
+│   ├── env.py
+│   └── versions/
+│       ├── 3ebd108c1434_create_ingestion_and_vulnerabilities_.py
+│       ├── 1234a9f4ca9d_create_exploitation_status_table.py
+│       ├── 435693ec8051_create_vulnerability_prioritizations_.py
+│       ├── 58291a1d0f2a_create_organizations_assets_observations.py
+│       ├── 6b3c9f7a8e12_create_assessments_and_telemetry_tables.py
+│       ├── 8c4e1f9a2d34_create_insurance_policies_and_coverage_tables.py
+│       └── b282299087ec_create_underwriting_review_tables.py
 ├── config/
-│   └── settings.py              # Pydantic v2 BaseSettings (DB, NVD, Guidewire)
+│   └── settings.py                          # Pydantic v2 BaseSettings (DB, JWT, CORS, CSV limit, PolicyCenter mock)
 ├── app/
-│   ├── main.py                  # ASGI factory, middleware, diagnostic endpoints
-│   ├── api/
-│   │   └── v1/
-│   │       ├── router.py        # Centralized v1 router mounting all sub-routers
-│   │       ├── ingestion.py     # NVD CVE ingestion job trigger & run history
-│   │       ├── vulnerabilities.py # Normalized CVE intelligence queries & filters
-│   │       ├── telemetry.py     # Posture ingestion & retrieval endpoints
-│   │       └── assessments.py   # Risk scoring & Guidewire dispatch endpoints
+│   ├── main.py                              # FastAPI app factory, restricted CORS, health/root endpoints
+│   ├── api/v1/
+│   │   ├── router.py                        # Consolidated v1 router
+│   │   ├── auth.py                          # OAuth2 token / JSON login / current user identity
+│   │   ├── overview.py                      # Platform dashboard overview metrics
+│   │   ├── ingestion.py                     # NVD CVE & CISA KEV ingestion triggers & run history
+│   │   ├── vulnerabilities.py               # Normalized CVE intelligence catalog
+│   │   ├── exploitation.py                  # CISA KEV exploitation lookup & enrichment
+│   │   ├── prioritization.py                # Deterministic P1–P4 threat triage evaluation
+│   │   ├── organizations.py                 # Insured organizations & data authorization lifecycle
+│   │   ├── assets.py                        # Asset inventory CRUD & CSV import (5 MB limit)
+│   │   ├── observations.py                  # Scanner vulnerability observations, CSV import & CVE matching
+│   │   ├── telemetry.py                     # Persistent posture telemetry snapshots & scenario seeding
+│   │   ├── assessments.py                   # Risk scoring + unified UnderwritingService referral trigger
+│   │   ├── policies.py                      # Structured cyber insurance policies & coverage sections
+│   │   ├── coverage.py                      # Coverage gap evaluation & simplified hypothetical loss simulation
+│   │   └── underwriting.py                  # Underwriting reviews, state transitions, dispatch, persistent activities
 │   ├── core/
-│   │   ├── risk_engine.py       # Deterministic actuarial scoring engine
-│   │   └── coverage_engine.py   # Policy endorsement & financial gap engine
+│   │   ├── security.py                      # PBKDF2-HMAC-SHA256 hashing, HS256 JWT, get_current_user dependency
+│   │   ├── vulnerability_prioritization_engine.py
+│   │   ├── risk_engine.py                   # Deterministic 0–100 posture & CVE aging risk scorer
+│   │   ├── coverage_engine.py               # Coverage clarity & simplified hypothetical loss gap analyzer
+│   │   └── underwriting_state_machine.py    # Lifecycle transitions & human-only APPROVED/DECLINED guard
 │   ├── db/
-│   │   ├── base.py              # SQLAlchemy 2.x DeclarativeBase
-│   │   └── session.py           # Engine & SessionLocal dependency
-│   ├── models/
-│   │   ├── ingestion.py         # DataIngestionRun SQLAlchemy model
-│   │   └── vulnerability.py     # Vulnerability SQLAlchemy model
-│   ├── repositories/
-│   │   ├── ingestion_repository.py     # Ingestion run history data access
-│   │   └── vulnerability_repository.py # Idempotent CVE persistence & search
-│   ├── schemas/
-│   │   ├── ingestion.py         # Ingestion run request & response Pydantic models
-│   │   ├── vulnerability.py     # Vulnerability intelligence Pydantic models
-│   │   ├── telemetry.py         # TelemetrySnapshot & CVE Pydantic models
-│   │   ├── risk.py              # Assessment, Penalty & Recommendation models
-│   │   └── guidewire.py         # Guidewire JSON:API specification models
-│   └── services/
-│       ├── nvd_client.py        # NIST NVD API 2.0 client & parser
-│       ├── ingestion_service.py # Ingestion run coordinator & upsert logic
-│       └── guidewire_client.py  # Asynchronous Guidewire Cloud REST client
-├── data/
-│   └── scenarios.json           # Pre-configured deterministic test scenarios
-└── tests/                       # Pytest unit & integration test suite
+│   │   ├── base.py
+│   │   └── session.py
+│   ├── models/                              # SQLAlchemy 2.x persistent models (SQLite / PostgreSQL compatible)
+│   ├── repositories/                        # Data-access repositories
+│   ├── schemas/                             # Pydantic v2 request/response contracts
+│   └── services/                            # Domain coordination services & MockPolicyCenterAdapter
+├── frontend/                                # React 19 + TypeScript + Vite + Tailwind CSS v4 + Vitest
+│   └── src/
+│       ├── components/                      # Layout (with Sign In modal), Policy/Coverage/Risk calculation cards
+│       ├── pages/                           # Overview, Explorer, IngestionRuns, Organizations, ObservedVulns, Underwriting, Detail
+│       └── services/apiClient.ts            # Bearer JWT attachment, error formatting, typed API client
+├── data/scenarios.json                      # Predefined demonstration scenarios
+└── tests/
+    ├── conftest.py                          # Isolated temporary SQLite DB (`%TEMP%/crgc_test_isolated.db`) + auth overrides
+    └── ...                                  # Pytest suites (Phases 1A–1F)
 ```
 
 ---
 
 ## 3. Current API Endpoints
 
-CRGC exposes the following HTTP endpoints documented via OpenAPI / Swagger UI:
+CRGC exposes the following primary REST endpoint groups under `/api/v1` (plus `/` and `/health`):
 
-| Method | Path | Category | Description |
-|---|---|---|---|
-| `GET` | `/` | System | Service metadata, operational status, and actuarial benchmark overview. |
-| `GET` | `/health` | System | Healthcheck probe reporting Guidewire connectivity status and mode. |
-| `POST` | `/api/v1/ingestion/nvd/run` | Ingestion | Triggers on-demand NVD CVE API 2.0 ingestion with pagination and idempotent upsert. |
-| `GET` | `/api/v1/ingestion/runs` | Ingestion | Retrieves historical vulnerability ingestion execution records and metrics. |
-| `GET` | `/api/v1/vulnerabilities` | Vulnerabilities | Lists normalized vulnerability intelligence records with severity and keyword filters. |
-| `GET` | `/api/v1/vulnerabilities/{cve_id}` | Vulnerabilities | Fetches detailed vulnerability intelligence including CWE, CPE, references, and preserved raw NVD payload. |
-| `POST` | `/api/v1/telemetry/ingest` | Telemetry | Ingests a new security posture snapshot for a policyholder. |
-| `GET` | `/api/v1/telemetry/{policy_number}/latest` | Telemetry | Fetches the most recent telemetry snapshot stored for a policy. |
-| `GET` | `/api/v1/telemetry` | Telemetry | Lists summary metadata for all currently tracked policies. |
-| `POST` | `/api/v1/assessments/evaluate` | Assessment | Runs actuarial scoring and coverage analysis on stored telemetry; dispatches to Guidewire if review threshold is breached. |
-| `POST` | `/api/v1/assessments/scenarios/{scenario_id}/execute` | Assessment | Executes a pre-configured scenario from `data/scenarios.json`. |
-| `GET` | `/api/v1/assessments/scenarios/catalog` | Assessment | Catalogs available deterministic demonstration scenarios. |
-| `GET` | `/api/v1/assessments/{assessment_id}` | Assessment | Retrieves a previously completed assessment by unique ID. |
-| `GET` | `/api/v1/assessments` | Assessment | Lists historical risk assessments. |
+| Route Group | Key Operations | Auth Requirement |
+|---|---|---|
+| `/` , `/health` | Service metadata, mock PolicyCenter connectivity probe | Public |
+| `/api/v1/auth/*` | `POST /token` (OAuth2 form), `POST /login` (JSON), `GET /me` | `/me` requires JWT |
+| `/api/v1/ingestion/*` | `POST /nvd/run`, `POST /kev/run`, `GET /runs` | `POST` requires JWT |
+| `/api/v1/vulnerabilities/*` | Normalized CVE intelligence list & details | Public Read |
+| `/api/v1/exploitation-status/*` | CISA KEV enrichment lookup & stats | Public Read |
+| `/api/v1/prioritization/*` | `POST /run` P1–P4 evaluation, `GET /results` | `POST` requires JWT |
+| `/api/v1/organizations/*` | Organization onboarding, telemetry, assessments, assets, observations | Mutating routes require JWT; org-scoped data requires `GRANTED` authorization |
+| `/api/v1/assets/import` | Multipart `.csv` asset inventory import (max 5 MB) | JWT + `GRANTED` Org |
+| `/api/v1/vulnerability-observations/import` | Multipart `.csv` scanner observation import (max 5 MB) & matching | JWT + `GRANTED` Org |
+| `/api/v1/policies/*` | Structured insurance policies, limits, deductibles, coverage sections | `POST`/`PATCH` require JWT |
+| `/api/v1/coverage/*` | `POST /evaluate` (persisted), `POST /simulate-loss` (ephemeral), `GET /history` | `POST` requires JWT |
+| `/api/v1/underwriting/*` | Reviews queue, state transitions (`APPROVED`/`DECLINED` human-only), dispatch, retry, simulated activity lookup | All endpoints require JWT |
 
 ---
 
-## 4. Vulnerability Intelligence & NVD Ingestion Layer
+## 4. Authentication, Authorization & Input Security
 
-### Data Ingestion Architecture
-* **NIST NVD API 2.0 Client** (`https://services.nvd.nist.gov/rest/json/cves/2.0`):
-  - Supports query filters: `cveId`, `pubStartDate`, `pubEndDate`, `lastModStartDate`, `lastModEndDate`, `hasKev`, `resultsPerPage`, `startIndex`.
-  - Offset-based automatic pagination reading `totalResults`, `startIndex`, and `resultsPerPage`.
-  - Rate-limit adherence with configurable delays (`nvd_rate_limit_delay`).
-  - Secure API key authorization: injects `apiKey` in request headers when configured (`NVD_API_KEY`), never in the URL.
-* **Idempotent Persistence**:
-  - One database row per unique `cve_id`.
-  - Re-running ingestion updates existing rows (`records_updated`) instead of creating duplicates (`records_inserted == 0`).
-  - Preserves complete upstream JSON payload in `raw_payload`.
-
-### Database Schema (SQLAlchemy 2.x & Alembic)
-1. **`data_ingestion_runs`**:
-   - `ingestion_run_id` (UUID PK)
-   - `source` (Text, default 'NVD_CVE_API')
-   - `source_url` (Text)
-   - `retrieved_at` (Timestamp with timezone)
-   - `status` (Text: SUCCESS, PARTIAL_SUCCESS, FAILED, RUNNING)
-   - `records_received`, `records_inserted`, `records_updated`, `records_skipped` (Integers)
-   - `error_message` (Nullable Text)
-   - `correlation_id` (UUID)
-2. **`vulnerabilities`**:
-   - `vulnerability_id` (UUID PK)
-   - `cve_id` (Unique Text, indexed)
-   - `source` (Text, default 'NVD')
-   - `source_identifier` (Text)
-   - `published_at`, `last_modified_at` (Timestamps with timezone)
-   - `vuln_status` (Text)
-   - `description` (Text)
-   - `cvss_version`, `cvss_base_score`, `cvss_severity`, `cvss_vector`
-   - `cwe_ids` (JSON list of CWE strings)
-   - `cpe_criteria` (JSON list of CPE criteria strings)
-   - `references_json` (JSON list of advisory links)
-   - `raw_payload` (Complete NVD JSON)
-   - `ingestion_run_id` (UUID FK -> `data_ingestion_runs.ingestion_run_id`)
-   - `created_at`, `updated_at` (Timestamps)
-
-3. **`exploitation_status`** (CISA KEV Enrichment):
-   - `exploitation_status_id` (UUID PK)
-   - `vulnerability_id` (Nullable UUID FK -> `vulnerabilities.vulnerability_id`)
-   - `cve_id` (Unique Text, indexed)
-   - `kev_flag` (Boolean, default True)
-   - `kev_date_added` (Nullable Date)
-   - `kev_due_date` (Nullable Date)
-   - `required_action` (Nullable Text)
-   - `vulnerability_name` (Nullable Text)
-   - `known_ransomware_use` (Nullable Boolean)
-   - `source` (Text, default 'CISA_KEV')
-   - `source_url` (Text)
-   - `retrieved_at` (Timestamp with timezone)
-   - `raw_payload` (Complete KEV JSON entry)
-   - `ingestion_run_id` (UUID FK -> `data_ingestion_runs.ingestion_run_id`)
-   - `created_at`, `updated_at` (Timestamps)
-
-4. **`vulnerability_prioritizations`** (Vulnerability Intelligence Prioritization):
-   - `prioritization_id` (UUID PK)
-   - `vulnerability_id` (Nullable UUID FK -> `vulnerabilities.vulnerability_id`)
-   - `cve_id` (Text, indexed)
-   - `priority` (Text, indexed: 'P1', 'P2', 'P3', 'P4')
-   - `priority_score` (Float, indexed: 0.0 to 100.0)
-   - `reason_codes` (JSON list of triggered rule codes)
-   - `factor_results` (JSON list of factor breakdowns: rule_code, triggered, score_contribution, evidence, rationale)
-   - `ruleset_version` (Text, indexed: e.g. 'v1.0.0')
-   - `insured_impact` (Text: 'UNKNOWN_UNTIL_AUTHORIZED_ASSET_DATA_IS_PROVIDED')
-   - `input_snapshot` (JSON snapshot of evaluated fields)
-   - `assessed_at` (Timestamp with timezone)
-   - `created_at`, `updated_at` (Timestamps)
+1. **User Authentication (OAuth2 + HS256 JWT)** in [security.py](file:///d:/New%20folder/cyber-risk-platform/app/core/security.py):
+   * Passwords verified using salted **PBKDF2-HMAC-SHA256** (`hashlib.pbkdf2_hmac`, 100k iterations, constant-time `hmac.compare_digest`).
+   * All mutating `POST`/`PUT`/`PATCH`/`DELETE` routes plus all `/api/v1/underwriting/*` endpoints require a bearer token via `Depends(get_current_user)`.
+   * Demo accounts (`underwriter_demo`, `admin_demo`) load passwords from `.env` (`DEMO_UNDERWRITER_PASSWORD`, `DEMO_ADMIN_PASSWORD`) only when `DEMO_AUTH_ENABLED=true` and `APP_ENV` is not `production`/`staging`.
+2. **Organization Data Authorization Boundary (`Organization.is_authorized()`)**:
+   * User authentication does not bypass organization consent boundaries. Asset and observation routes (`/organizations/{org_ref}/assets`, `/organizations/{org_ref}/observations`, `/assets/{asset_id}/vulnerabilities`) require `data_authorization_status == GRANTED`, returning HTTP `403` for `REVOKED`/`PENDING` and HTTP `404` for unknown orgs.
+3. **Upload & Transport Hardening**:
+   * CSV imports reject non-`.csv` filenames (`HTTP 400`) and payloads over `max_csv_upload_bytes` (default **5 MB**, `HTTP 413`).
+   * CORS middleware in [main.py](file:///d:/New%20folder/cyber-risk-platform/app/main.py) restricts `allow_origins` strictly to `app_settings.cors_allowed_origins`.
 
 ---
 
-## 5. Vulnerability Prioritization Engine (Public Intelligence Only)
+## 5. Database Schema & Migrations (Alembic)
 
-The [VulnerabilityPrioritizationEngine](file:///d:/New%20folder/cyber-risk-platform/app/core/vulnerability_prioritization_engine.py) provides deterministic, transparent threat scoring for ingested public CVE vulnerabilities.
+Persisted across **7 sequential Alembic migrations** (current head: `b282299087ec`):
 
-### Business Boundary & Non-Claims Notice
-* **Public Intelligence Only**: Evaluates public weaponization and severity metrics from NIST NVD and CISA KEV.
-* **No Insured Impact Claimed**: Prioritization does NOT evaluate asset inventory or insured installation state.
-* **Non-Actuarial Weights**: Weights and thresholds are configuration-driven, transparent heuristics and must NOT be represented as actuarially validated or empirically calibrated loss predictors.
-* **Permanent Marker**: Every prioritization result explicitly records `insured_impact = "UNKNOWN_UNTIL_AUTHORIZED_ASSET_DATA_IS_PROVIDED"`.
-
-### Ruleset (`v1.0.0`) & Configuration Weights
-1. **`KEV_LISTED`** (+35.0 pts): CVE listed in CISA KEV (`kev_flag = True`).
-2. **`CVSS_CRITICAL`** (+25.0 pts): CVSS base score $\ge 9.0$.
-3. **`CVSS_HIGH`** (+15.0 pts): CVSS base score $\ge 7.0$ and $< 9.0$.
-4. **`REMOTE_EXPLOITABLE`** (+15.0 pts): CVSS vector indicates Network attack vector (`AV:N`).
-5. **`LOW_PRIVILEGES_REQUIRED`** (+10.0 pts): CVSS vector indicates No Privileges Required (`PR:N`).
-6. **`KEV_DUE_DATE_NEAR`** (+10.0 pts): Remediation due date is within the next 14 days (or overdue).
-7. **`RECENTLY_PUBLISHED`** (+5.0 pts): NVD publication date is within the last 30 days.
-
-### Deterministic Priority Bands
-* **P1**: Score $\ge 75.0$ (Critical urgency)
-* **P2**: $50.0 \le \text{Score} < 75.0$ (High urgency)
-* **P3**: $25.0 \le \text{Score} < 50.0$ (Medium urgency)
-* **P4**: $\text{Score} < 25.0$ (Low urgency)
+| Migration | Tables Managed | Purpose |
+|---|---|---|
+| `3ebd108c1434` | `data_ingestion_runs`, `vulnerabilities` | NVD 2.0 ingestion tracking & deduplicated normalized CVEs |
+| `1234a9f4ca9d` | `exploitation_status` | CISA KEV enrichment linked to CVEs |
+| `435693ec8051` | `vulnerability_prioritizations` | Deterministic P1–P4 intelligence triage results |
+| `58291a1d0f2a` | `organizations`, `assets`, `vulnerability_observations` | Authorized organizations, asset inventory (`(org_id, external_asset_ref)`), SHA-256 deduplicated observations |
+| `6b3c9f7a8e12` | `telemetry_snapshots`, `risk_assessments`, `assessment_factors` | Persistent posture snapshots, deterministic risk scores, and factor breakdowns |
+| `8c4e1f9a2d34` | `insurance_policies`, `policy_coverage_sections`, `coverage_evaluations` | Policy terms/sublimits/deductibles & persisted 8-category coverage gap evaluations |
+| `b282299087ec` | `underwriting_reviews`, `underwriting_review_notes`, `underwriting_dispatch_attempts`, `underwriting_review_status_history` | Idempotent underwriting reviews, frozen evidence snapshots, underwriter audit notes, PolicyCenter dispatch attempts, and state transition logs |
 
 ---
 
-## 6. Current RiskEngine Rules (Insured Organization Posture)
+## 6. RiskEngine Rules (Insured Organization Posture)
 
-The [RiskEngine](file:///d:/New%20folder/cyber-risk-platform/app/core/risk_engine.py) provides 100% deterministic, explainable actuarial scoring without opaque black-box machine learning. The total aggregate risk score is calculated on a scale from `0.0` to `100.0`.
+[RiskEngine](file:///d:/New%20folder/cyber-risk-platform/app/core/risk_engine.py) computes an explainable deterministic score from `0.0` to `100.0`:
+$$\text{Score} = \text{clamp}\bigl(5.0 + \text{MFA\_Penalty} + \text{RDP\_Penalty} + \text{Critical\_CVE\_Aging\_Penalty} + \text{EDR\_Penalty},\; 0.0,\; 100.0\bigr)$$
+1. **MFA Enforcement** ($\ge 80\%$ benchmark): up to $+30.0$ pts.
+2. **Public RDP Exposure** (Port 3389 closed benchmark): $+25.0$ pts if exposed.
+3. **Critical CVE Aging** ($\le 14\text{ days}$ patch SLA): $+12.5$ pts per aging deduplicated CVE, capped at $+35.0$ pts.
+4. **EDR Agent Coverage** ($\ge 85\%$ benchmark): up to $+20.0$ pts.
 
-### Scoring Calculation
-$$\text{Aggregate Risk Score} = \min(100.0, \max(0.0, \text{Base Score} + \sum \text{Penalties}))$$
-* **Base Risk Score**: Defaults to `5.0` (configurable in settings).
-
-### Factor Penalty Rules
-1. **Multi-Factor Authentication (MFA) Enforcement**:
-   - *Benchmark*: $\ge 80\%$ enterprise account coverage.
-   - *Penalty*: $1.0\text{ point per }1\%\text{ deficit below }80\%$, capped at $30.0\text{ points}$.
-2. **Public Remote Access (RDP) Exposure**:
-   - *Benchmark*: Port 3389 filtered/closed from the public internet.
-   - *Penalty*: $+25.0\text{ points}$ if Port 3389 is exposed or present in open ports; $0.0\text{ points}$ otherwise.
-3. **Critical CVE Aging**:
-   - *Benchmark*: Patch SLA $\le 14\text{ days}$ for vulnerabilities with CVSS $\ge 9.0$ or Critical severity.
-   - *Penalty*: $+12.5\text{ points}$ per aging unpatched item, capped at $35.0\text{ points}$.
-4. **Endpoint Detection & Response (EDR) Agent Coverage**:
-   - *Benchmark*: $\ge 85\%$ endpoint installation rate.
-   - *Penalty*: Deficit below $85\%$ scaled by $111.11$, capped at $20.0\text{ points}$.
-
-### Threshold Classification
-* **Risk Tiers**:
-  - `LOW`: Score $< 40.0$
-  - `MEDIUM`: $40.0 \le \text{Score} < 60.0$
-  - `HIGH`: $60.0 \le \text{Score} < 80.0$
-  - `CRITICAL`: $\text{Score} \ge 80.0$
-* **Policy Actions**:
-  - `NOMINAL` ($\text{Score} < 40.0$): Standard in-force terms maintained.
-  - `MONITOR` ($40.0 \le \text{Score} \le 60.0$): Advisory logged, flagged for 30-day re-assessment.
-  - `REVIEW_REQUIRED` ($\text{Score} > 60.0$): Mandates underwriter review and triggers Guidewire integration workflow.
+**Tiers & Actions:** `LOW` (`< 40`) $\to$ `NOMINAL`; `MEDIUM` (`40–60`) $\to$ `MONITOR`; `HIGH` (`60–80`) / `CRITICAL` (`>= 80`) $\to$ `REVIEW_REQUIRED`. Qualifying `REVIEW_REQUIRED` assessments route through [UnderwritingService](file:///d:/New%20folder/cyber-risk-platform/app/services/underwriting_service.py) with idempotent review reuse and no unsolicited auto-dispatch unless requested.
 
 ---
 
-## 6. Current CoverageEngine Behavior
+## 7. CoverageEngine Behavior
 
-The [CoverageEngine](file:///d:/New%20folder/cyber-risk-platform/app/core/coverage_engine.py) analyzes in-force policy structures (default: $\$5\text{M}$ Aggregate Limit, $\$2.5\text{M}$ Ransomware Sublimit, $\$50\text{K}$ Retention Deductible) against the evaluated risk posture:
-
-* **NOMINAL Action**:
-  - Sublimit adjustment: $0\%$
-  - Deductible multiplier: $1.0\times$
-  - Co-insurance requirement: $0\%$
-  - Financial exposure estimate: $\$650\text{K}$ projected breach loss, $\$0$ uninsured coverage gap.
-* **MONITOR Action**:
-  - Sublimit adjustment: $0\%$
-  - Deductible multiplier: $1.0\times$
-  - Co-insurance requirement: $0\%$
-  - Endorsement recommendation: `ADV-CYBER-HYGIENE-NOTICE`
-  - Financial exposure estimate: $\$1.45\text{M}$ projected breach loss, $\$0$ uninsured coverage gap.
-* **REVIEW_REQUIRED Action**:
-  - Sublimit adjustment: $-50\%$ restriction on Ransomware/Extortion Sublimit (lowering sublimit to $\$1.25\text{M}$).
-  - Deductible multiplier: $2.0\times$ ($\$100\text{K}$) for `HIGH` tier; $3.0\times$ ($\$150\text{K}$) for `CRITICAL` tier.
-  - Co-insurance requirement: $20\%$ for `HIGH` tier; $25\%$ for `CRITICAL` tier.
-  - Endorsement recommendations: `CYBER-RANSOM-SUB-RESTRICT-2026` (High) or `CYBER-CRITICAL-SURCHARGE-RESTRICT-2026` (Critical).
-  - Financial exposure estimate: Projected breach loss spikes to $\$3.2\text{M}$, revealing an immediate $\$700\text{K}$ uninsured coverage gap above the in-force sublimit.
+[CoverageEngine](file:///d:/New%20folder/cyber-risk-platform/app/core/coverage_engine.py) evaluates stored insurance policies across 8 standardized coverage categories (`RANSOMWARE_EXTORTION`, `BUSINESS_INTERRUPTION`, `INCIDENT_RESPONSE_FORENSICS`, `DATA_BREACH_PRIVACY`, `SYSTEM_RESTORATION`, `REGULATORY_FINES`, `THIRD_PARTY_LIABILITY`, `HARDWARE_BRICKING`) against sublimits, deductibles, waiting periods, coinsurance, and endorsements. `POST /api/v1/coverage/evaluate` persists a `CoverageEvaluationModel` snapshot; `POST /api/v1/coverage/simulate-loss` computes ephemeral simplified hypothetical loss scenarios (`estimated_gross_loss`, `covered_loss`, `uninsured_gap`) without modifying stored policies.
 
 ---
 
-## 7. Current Guidewire Mock Behavior
+## 8. Guidewire Mock Behavior & Underwriting Workflow
 
-When running with `GW_MOCK_MODE=true` (the default setting in [config/settings.py](file:///d:/New%20folder/cyber-risk-platform/config/settings.py)), [GuidewireClient](file:///d:/New%20folder/cyber-risk-platform/app/services/guidewire_client.py) avoids external network calls and generates synthetic responses adhering strictly to the **Guidewire PolicyCenter 10.2.1 Cloud REST API** JSON:API standards:
-
-* **Authentication**: Returns a simulated OAuth2 bearer token header (`Bearer simulated-gwcp-oauth2-token`) without querying the token endpoint.
-* **Activity Creation (`POST /rest/common/v1/activities`)**:
-  - Simulates creation of an Underwriter Review Activity with synthetic ID `pc:act_<hex>`.
-  - Sets Priority to `urgent` if $\text{Score} \ge 75.0$, otherwise `high`.
-  - Sets Due Date to $+48\text{ hours}$ SLA.
-  - Embeds the full actuarial penalty breakdown and coverage recommendations in the activity description.
-* **Policy Notes (`POST /rest/policy/v1/policies/{policyNumber}/notes`)**:
-  - Simulates creation of an underwriting audit note with synthetic ID `pc:note_<hex>`.
-  - Attaches formatted markdown audit trail containing telemetry summary, scoring factors, and loss gap analysis.
-* **Policy Inquiries (`GET /rest/policy/v1/policies/{policyNumber}`)**:
-  - Returns simulated policy metadata, active coverage lines, sublimits, and deductibles for demonstration and offline testing.
+When running with `GW_MOCK_MODE=true` (default), [MockPolicyCenterAdapter](file:///d:/New%20folder/cyber-risk-platform/app/services/mock_policycenter_adapter.py) and [GuidewireClient](file:///d:/New%20folder/cyber-risk-platform/app/services/guidewire_client.py) simulate Guidewire PolicyCenter v10.2.1 JSON:API semantics locally without external calls:
+* **Lifecycle State Machine** ([underwriting_state_machine.py](file:///d:/New%20folder/cyber-risk-platform/app/core/underwriting_state_machine.py)): `PENDING` $\to$ `DISPATCHED` $\to$ `ACKNOWLEDGED` $\to$ `IN_REVIEW` / `INFORMATION_REQUESTED` $\to$ `APPROVED` / `DECLINED` $\to$ `CLOSED`. Automated/system actors are blocked from approving or declining.
+* **Idempotent Dispatch & Persistent Activity Lookup:** Repeated dispatches for the same review reuse existing simulated activity IDs (`pc:act_...`). `GET /api/v1/underwriting/activities/{activity_id}` falls back to `underwriting_dispatch_attempts.response_payload_json` after backend restarts, returning `HTTP 404` for unknown IDs.
 
 ---
 
-## 8. Current In-Memory Stores
+## 9. In-Memory Stores vs. Persistence
 
-While vulnerability intelligence and ingestion executions are persisted in SQLite via SQLAlchemy, the existing ephemeral simulation stores remain available:
-
-* **`_telemetry_store: Dict[str, TelemetrySnapshot]`** (in [app/api/v1/telemetry.py](file:///d:/New%20folder/cyber-risk-platform/app/api/v1/telemetry.py)):
-  - Stores the latest cybersecurity telemetry snapshot indexed by `policy_number`.
-  - Updated upon every `POST /api/v1/telemetry/ingest` or scenario execution.
-* **`_assessments_store: Dict[str, RiskAssessmentResult]`** (in [app/api/v1/assessments.py](file:///d:/New%20folder/cyber-risk-platform/app/api/v1/assessments.py)):
-  - Retains completed actuarial risk evaluations indexed by `assessment_id`.
-  - Used for audit queries (`GET /api/v1/assessments/{assessment_id}`) and listing history.
-
----
-
----
-
-## 9. Authorized Asset Inventory & Vulnerability Observations
-
-### Underwriting & Intelligence Boundary
-* Public CVE and CISA KEV intelligence alone **does NOT prove** that an insured organization has a vulnerability installed or is exposed.
-* Observations are created **only** from authorized asset inventories and authenticated vulnerability-scanner outputs.
-* No network port scanning is performed.
-* No automatic PolicyCenter activities, notes, or premium changes are triggered in this stage.
-* Observations are **never** classified as `CONFIRMED` unless a scanner explicitly reports that status.
-
-### Data Model & Deduplication
-1. **Organizations (`organizations`)**:
-   - Stores `organization_id` (UUID PK), `organization_ref` (unique text), `display_name`, `data_authorization_status` (`GRANTED`, `REVOKED`, `PENDING`), and `authorization_scope` (JSON).
-   - Ingestion is rejected with HTTP 403 unless status is explicitly `GRANTED`.
-2. **Assets (`assets`)**:
-   - Stores `asset_id` (UUID PK), `organization_id` (FK), `external_asset_ref`, `asset_type`, `hostname`, `vendor`, `product`, `version`, `cpe_name`, `criticality`, and `raw_payload`.
-   - Unique constraint: `(organization_id, external_asset_ref)`.
-3. **Vulnerability Observations (`vulnerability_observations`)**:
-   - Stores `observation_id` (UUID PK), `organization_id` (FK), `asset_id` (FK), `cve_id`, `scanner_source`, `status` (`OBSERVED`, `CONFIRMED`, `FIXED`, `FALSE_POSITIVE`, `UNKNOWN`), `scanner_severity`, `evidence`, `source_record_id`, and `dedup_hash`.
-   - **Deduplication Key**: SHA-256 hash of `f"{organization_id}:{asset_id}:{normalized_cve}:{normalized_scanner}:{source_record_id or ''}"`. Enforced via unique constraint `(organization_id, dedup_hash)`.
-
-### Matching Semantics
-* **`SCANNER_REPORTED`**: Exact scanner-detected CVE linked to asset. Status is preserved as reported by the scanner tool. Unknown CVEs in public NVD feeds are stored as unmatched observations, not discarded.
-* **`CPE_CANDIDATE`**: Prospective applicability candidate based on product/CPE string match against public CVE records. Never converted into a confirmed scanner finding. Labeled with `confidence: "LOW_TO_MEDIUM"` and explicit limitation notices.
+* Telemetry snapshots, risk assessments, factor breakdowns, coverage evaluations, policies, organizations, assets, vulnerability observations, and underwriting reviews/dispatch attempts are **all persisted in SQLite** (`crgc.db`).
+* Remaining in-memory dictionaries are strictly compatibility caches/ephemeral stores (`telemetry._telemetry_store` for legacy standalone scenario IDs such as `POL-001`, and `MockPolicyCenterAdapter._simulated_activities` backed by durable `underwriting_dispatch_attempts` records).
 
 ---
 
 ## 10. Known Limitations
 
-1. **Public Feed vs Asset Evidence**: Public CVE/KEV intelligence does not establish organizational impact without authorized scanner telemetry.
-2. **Underwriting Boundary**: Asset observations do not alter policy terms or trigger automated Guidewire PolicyCenter activities in this release.
-3. **Local SQLite Primary**: SQLite is used for local development and testing (`crgc.db`). Models are engineered for PostgreSQL compatibility (`UUID`, `JSON`, `DateTime(timezone=True)`).
-4. **Guidewire Live Integration**: Default execution runs in mock simulation mode (`GW_MOCK_MODE=true`).
-5. **Predefined Scenarios**: Underwriting scenarios remain loaded from [data/scenarios.json](file:///d:/New%20folder/cyber-risk-platform/data/scenarios.json).
-
+1. **Public Feed vs. Asset Evidence**: Public CVE/KEV intelligence does not prove organizational exposure without authorized asset/scanner evidence (`data_authorization_status == GRANTED`).
+2. **Simulated Guidewire Integration**: All PolicyCenter activities and policy notes are locally simulated; no live PolicyCenter server is integrated.
+3. **Non-Actuarial Benchmarks**: Risk scoring and simplified loss scenarios use deterministic heuristic formulas rather than empirically calibrated actuarial loss curves.
+4. **Local SQLite Runtime**: Development defaults to local SQLite (`crgc.db`), while automated tests run strictly in an isolated temporary SQLite database via [tests/conftest.py](file:///d:/New%20folder/cyber-risk-platform/tests/conftest.py).

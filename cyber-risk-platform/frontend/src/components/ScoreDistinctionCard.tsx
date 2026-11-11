@@ -78,7 +78,7 @@ export const ScoreDistinctionCard: React.FC<{ defaultOpen?: boolean }> = ({ defa
             <div className="text-xl font-bold font-mono text-blue-200">0.0 – 100.0</div>
             <div className="text-xs text-blue-300 font-medium">Insured Underwriting Telemetry Posture</div>
             <p className="text-[11px] text-slate-300 leading-relaxed">
-              Actuarial RiskEngine calculation based on insured security controls: Base (5.0) + MFA deficit (max 30) + Exposed RDP (25) + Aging Critical CVEs (max 35) + EDR gap (max 20).
+              Deterministic Cyber Risk Engine calculation based on insured security controls: Base (5.0) + MFA deficit (max 30) + Exposed RDP (25) + Aging Critical CVEs (max 35) + EDR gap (max 20).
             </p>
             <div className="pt-2 border-t border-blue-900/40 text-[11px] space-y-1 font-mono">
               <div className="text-emerald-400 flex justify-between"><span>Low (&lt; 40.0):</span> <span>NOMINAL</span></div>

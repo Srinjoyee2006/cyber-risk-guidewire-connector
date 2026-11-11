@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Body, Depends, Query, status
 from sqlalchemy.orm import Session
 
+from app.core.security import get_current_user, UserProfile
 from app.db.session import get_db
 from app.repositories.ingestion_repository import IngestionRepository
 from app.schemas.ingestion import IngestionRunRequest, KevIngestionRunRequest, IngestionRunResponse
@@ -37,6 +38,7 @@ def get_ingestion_repo(db: Annotated[Session, Depends(get_db)]) -> IngestionRepo
 async def run_nvd_ingestion(
     request: IngestionRunRequest,
     service: Annotated[IngestionService, Depends(get_ingestion_service)],
+    current_user: UserProfile = Depends(get_current_user),
 ) -> IngestionRunResponse:
     """Trigger an on-demand NVD CVE ingestion job."""
     correlation_id = uuid4()
@@ -54,6 +56,7 @@ async def run_nvd_ingestion(
 async def run_cisa_kev_ingestion(
     service: Annotated[IngestionService, Depends(get_ingestion_service)],
     request: Optional[KevIngestionRunRequest] = Body(default=None),
+    current_user: UserProfile = Depends(get_current_user),
 ) -> IngestionRunResponse:
     """Trigger an on-demand CISA KEV catalog ingestion and enrichment job."""
     correlation_id = uuid4()

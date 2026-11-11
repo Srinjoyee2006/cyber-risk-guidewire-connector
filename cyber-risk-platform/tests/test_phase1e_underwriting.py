@@ -17,7 +17,12 @@ from app.models.policy import (
     PolicyCoverageSectionModel,
     CoverageEvaluationModel,
 )
-from app.models.assessment import RiskAssessmentModel
+from app.models.assessment import (
+    RiskAssessmentModel,
+    TelemetrySnapshotModel,
+    AssessmentFactorBreakdownModel,
+    AssessmentEvidenceSnapshotModel,
+)
 from app.models.underwriting import (
     UnderwritingReviewModel,
     UnderwritingDispatchAttemptModel,
@@ -86,8 +91,28 @@ def authorized_org(db_session: Session):
         ).delete(synchronize_session=False)
         db_session.delete(p)
 
+    db_session.query(AssessmentEvidenceSnapshotModel).filter(
+        AssessmentEvidenceSnapshotModel.assessment_id.in_(
+            db_session.query(RiskAssessmentModel.assessment_id).filter(
+                RiskAssessmentModel.organization_ref == org_ref
+            )
+        )
+    ).delete(synchronize_session=False)
+
+    db_session.query(AssessmentFactorBreakdownModel).filter(
+        AssessmentFactorBreakdownModel.assessment_id.in_(
+            db_session.query(RiskAssessmentModel.assessment_id).filter(
+                RiskAssessmentModel.organization_ref == org_ref
+            )
+        )
+    ).delete(synchronize_session=False)
+
     db_session.query(RiskAssessmentModel).filter(
         RiskAssessmentModel.organization_ref == org_ref
+    ).delete(synchronize_session=False)
+
+    db_session.query(TelemetrySnapshotModel).filter(
+        TelemetrySnapshotModel.organization_ref == org_ref
     ).delete(synchronize_session=False)
 
     db_session.delete(org)

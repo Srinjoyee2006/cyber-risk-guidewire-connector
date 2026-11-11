@@ -9,6 +9,7 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.core.security import get_current_user, UserProfile
 from app.db.session import get_db
 from app.repositories.prioritization_repository import PrioritizationRepository
 from app.schemas.prioritization import (
@@ -44,6 +45,7 @@ def get_prioritization_repo(db: Annotated[Session, Depends(get_db)]) -> Prioriti
 )
 async def run_prioritization(
     service: Annotated[PrioritizationService, Depends(get_prioritization_service)],
+    _current_user: Annotated[UserProfile, Depends(get_current_user)],
     request: Optional[PrioritizationRunRequest] = Body(default=None),
 ) -> PrioritizationRunSummaryResponse:
     """Trigger a deterministic vulnerability prioritization evaluation job."""

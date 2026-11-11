@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Initializing CyberRisk-Guidewire-Connector (CRGC) v1.0.0")
     logger.info("Target PolicyCenter Version: %s", settings.gw_policycenter_version)
     logger.info("Guidewire Mock Mode: %s", "ENABLED (Local Simulated)" if settings.gw_mock_mode else "DISABLED (Live GWCP)")
-    logger.info("Actuarial Thresholds: Monitor=%.1f | Review=%.1f", settings.risk_score_monitor_threshold, settings.risk_score_review_threshold)
+    logger.info("Risk Benchmarks: Monitor=%.1f | Review=%.1f", settings.risk_score_monitor_threshold, settings.risk_score_review_threshold)
     logger.info("=" * 70)
 
     # Initialize relational database tables
@@ -73,12 +73,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title="CyberRisk-Guidewire-Connector (CRGC)",
         description=(
-            "Enterprise Edge Risk Analytics Service for Commercial Cyber Insurance.\n\n"
+            "Enterprise Edge Risk Analytics & Underwriting Advisory Service.\n\n"
             "**Key Capabilities:**\n"
-            "- Ingests continuous and periodic cybersecurity posture telemetry snapshots.\n"
-            "- Evaluates explainable, deterministic actuarial scoring rules (MFA, EDR, RDP, Critical CVE Aging).\n"
-            "- Formulates policy coverage modifications (sublimit cuts, retention surcharges, co-insurance).\n"
-            "- Dispatches Underwriter Review Activities & Policy Notes to **Guidewire PolicyCenter 10.2.1** via Guidewire Cloud REST APIs."
+            "- Ingests NVD / CISA KEV public intelligence and organization-specific cybersecurity telemetry snapshots.\n"
+            "- Evaluates explainable, deterministic cyber risk scoring rules (MFA, EDR, RDP, Critical CVE Aging).\n"
+            "- Identifies potential cyber insurance coverage gaps and calculates simplified hypothetical loss scenarios.\n"
+            "- Coordinates Underwriter Review Workflows via a **Simulated Guidewire PolicyCenter 10.2.1** JSON:API adapter."
         ),
         version="1.0.0",
         docs_url="/docs",
@@ -88,11 +88,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     # --------------------------------------------------------------------------
-    # Security Middleware: CORS
+    # Security Middleware: CORS (Restricted to Explicitly Configured Origins)
     # --------------------------------------------------------------------------
+    allowed_origins = [
+        orig.strip()
+        for orig in (app_settings.cors_allowed_origins or "").split(",")
+        if orig.strip()
+    ]
+    if not allowed_origins:
+        allowed_origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -126,7 +134,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "target_guidewire_release": app_settings.gw_policycenter_version,
             "mock_mode": app_settings.gw_mock_mode,
             "documentation": "/docs",
-            "actuarial_benchmarks": {
+            "risk_benchmarks": {
                 "mfa_min_threshold": f"{app_settings.mfa_enforcement_threshold * 100:.0f}%",
                 "edr_min_threshold": f"{app_settings.edr_agent_coverage_threshold * 100:.0f}%",
                 "cve_max_aging_days": app_settings.critical_cve_aging_days_threshold,

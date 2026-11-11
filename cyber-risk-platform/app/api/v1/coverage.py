@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from config.settings import Settings, get_settings
+from app.core.security import get_current_user, UserProfile
 from app.db.session import get_db
 from app.services.coverage_service import CoverageService
 from app.schemas.coverage import (
@@ -42,6 +43,7 @@ def get_coverage_service(
 def evaluate_coverage(
     req: CoverageEvaluationRequest,
     service: Annotated[CoverageService, Depends(get_coverage_service)],
+    current_user: UserProfile = Depends(get_current_user),
 ) -> CoverageEvaluationResponse:
     return service.evaluate_coverage(req)
 
@@ -96,6 +98,7 @@ def get_active_gaps(
 def calculate_hypothetical_scenarios(
     req: HypotheticalCalculationRequest,
     service: Annotated[CoverageService, Depends(get_coverage_service)],
+    current_user: UserProfile = Depends(get_current_user),
 ) -> Sequence[HypotheticalLossScenario]:
     return service.calculate_hypothetical_scenarios(
         policy_id=req.policy_id,

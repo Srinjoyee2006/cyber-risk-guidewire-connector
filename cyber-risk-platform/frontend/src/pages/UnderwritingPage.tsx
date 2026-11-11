@@ -30,6 +30,7 @@ export const UnderwritingPage: React.FC = () => {
   const [metrics, setMetrics] = useState<UnderwritingDashboardMetrics | null>(null)
   const [organizations, setOrganizations] = useState<OrganizationResponse[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null)
   const [selectedReviewDetail, setSelectedReviewDetail] = useState<UnderwritingReview | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -65,6 +66,7 @@ export const UnderwritingPage: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true)
+      setLoadError(null)
       const [revs, mets, orgs] = await Promise.all([
         apiClient.listAllUnderwritingReviews(),
         apiClient.getUnderwritingDashboardMetrics(),
@@ -78,6 +80,7 @@ export const UnderwritingPage: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Failed to load underwriting data:', err)
+      setLoadError(err?.detail || err?.message || 'Failed to load underwriting workspace.')
     } finally {
       setLoading(false)
     }
@@ -117,7 +120,7 @@ export const UnderwritingPage: React.FC = () => {
       await fetchData()
       loadReviewDetail(result.review_id)
     } catch (err: any) {
-      setActionError(err?.response?.data?.detail || err?.message || 'Failed to trigger underwriting review')
+      setActionError(err?.detail || err?.response?.data?.detail || err?.message || 'Failed to trigger underwriting review')
     } finally {
       setActionLoading(false)
     }
@@ -133,7 +136,7 @@ export const UnderwritingPage: React.FC = () => {
       setShowDispatchModal(false)
       await fetchData()
     } catch (err: any) {
-      setActionError(err?.response?.data?.detail || err?.message || 'Failed to dispatch activity')
+      setActionError(err?.detail || err?.response?.data?.detail || err?.message || 'Failed to dispatch activity')
     } finally {
       setActionLoading(false)
     }
@@ -151,7 +154,7 @@ export const UnderwritingPage: React.FC = () => {
       setShowRetryModal(false)
       await fetchData()
     } catch (err: any) {
-      setActionError(err?.response?.data?.detail || err?.message || 'Failed to retry dispatch')
+      setActionError(err?.detail || err?.response?.data?.detail || err?.message || 'Failed to retry dispatch')
     } finally {
       setActionLoading(false)
     }
@@ -172,7 +175,7 @@ export const UnderwritingPage: React.FC = () => {
       setShowStatusModal(false)
       await fetchData()
     } catch (err: any) {
-      setActionError(err?.response?.data?.detail || err?.message || 'Failed to transition status')
+      setActionError(err?.detail || err?.response?.data?.detail || err?.message || 'Failed to transition status')
     } finally {
       setActionLoading(false)
     }
@@ -194,15 +197,17 @@ export const UnderwritingPage: React.FC = () => {
     })
   }, [reviews, searchQuery, statusFilter])
 
-  // Compute allowed transitions for selected review
+  // Compute allowed transitions matching backend VALID_STATUS_TRANSITIONS exactly
   const allowedTransitions = useMemo(() => {
     if (!selectedReviewDetail) return []
     const s = selectedReviewDetail.status
-    if (s === 'PENDING') return ['DISPATCHED', 'IN_REVIEW', 'DECLINED', 'CLOSED']
-    if (s === 'DISPATCHED') return ['ACKNOWLEDGED', 'IN_REVIEW', 'FAILED', 'DECLINED', 'CLOSED']
-    if (s === 'ACKNOWLEDGED' || s === 'IN_REVIEW') return ['INFORMATION_REQUESTED', 'APPROVED', 'DECLINED', 'CLOSED']
-    if (s === 'INFORMATION_REQUESTED') return ['IN_REVIEW', 'DECLINED', 'CLOSED']
-    if (s === 'FAILED') return ['PENDING', 'DISPATCHED', 'DECLINED', 'CLOSED']
+    if (s === 'PENDING') return ['DISPATCHED', 'FAILED', 'CLOSED']
+    if (s === 'FAILED') return ['DISPATCHED', 'CLOSED']
+    if (s === 'DISPATCHED') return ['ACKNOWLEDGED', 'IN_REVIEW', 'FAILED', 'CLOSED']
+    if (s === 'ACKNOWLEDGED' || s === 'IN_REVIEW' || s === 'INFORMATION_REQUESTED') {
+      return ['IN_REVIEW', 'INFORMATION_REQUESTED', 'APPROVED', 'DECLINED', 'CLOSED'].filter(t => t !== s)
+    }
+    if (s === 'APPROVED' || s === 'DECLINED') return ['CLOSED']
     return []
   }, [selectedReviewDetail])
 
@@ -222,6 +227,17 @@ export const UnderwritingPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Load / Auth Error Banner */}
+      {loadError && (
+        <div className="rounded-xl border border-rose-600/60 bg-rose-950/50 p-4 flex items-start gap-3 text-rose-200">
+          <XCircle className="h-5 w-5 text-rose-400 shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-semibold">Unable to load underwriting workflow</p>
+            <p className="text-xs text-rose-300/90 mt-1">{loadError}</p>
+          </div>
+        </div>
+      )}
 
       {/* Header and Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

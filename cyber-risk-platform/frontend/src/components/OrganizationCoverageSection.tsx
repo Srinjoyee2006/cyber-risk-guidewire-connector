@@ -509,7 +509,7 @@ export const OrganizationCoverageSection: React.FC<OrganizationCoverageSectionPr
               Ad-Hoc Loss Scenario Simulator
             </div>
             <p className="text-xs text-slate-400">
-              Model custom gross loss amounts against policy terms to observe deterministic deductible, coinsurance, sublimit caps, and uninsured gaps.
+              Model custom gross loss amounts against policy terms to observe deterministic deductible, coinsurance, sublimit caps, and uninsured gaps (ad-hoc ephemeral calculation — not saved to persistent evaluation history).
             </p>
 
             <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">

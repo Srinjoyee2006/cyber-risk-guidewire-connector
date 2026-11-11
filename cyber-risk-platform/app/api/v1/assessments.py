@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from config.settings import Settings, get_settings
+from app.core.security import get_current_user, UserProfile
 from app.db.session import get_db, SessionLocal
 from app.core.risk_engine import RiskEngine
 from app.core.coverage_engine import CoverageEngine
@@ -55,20 +56,21 @@ def load_scenarios_data() -> dict:
 @router.post(
     "/evaluate",
     response_model=RiskAssessmentResult,
-    summary="Evaluate Policy Risk & Trigger Guidewire Workflow",
+    summary="Evaluate Policy Risk & Route Underwriting Workflow",
     description=(
-        "Executes explainable actuarial risk scoring on the latest persisted telemetry and organization vulnerability matches. "
+        "Executes explainable deterministic risk scoring on the latest persisted telemetry and organization vulnerability matches. "
         "Stores the assessment, factor breakdown, and vulnerability evidence snapshots persistently in SQLite. "
-        "If score > 60 (REVIEW_REQUIRED), automatically dispatches an Underwriter Activity and Policy Audit Note to Guidewire PolicyCenter 10.2.1."
+        "If score > 60 (REVIEW_REQUIRED), routes through the persistent UnderwritingService workflow."
     ),
 )
 async def evaluate_assessment(
     request: AssessmentRequest,
     db: Session = Depends(get_db),
     settings: Annotated[Settings, Depends(get_settings)] = None,
+    current_user: UserProfile = Depends(get_current_user),
 ) -> RiskAssessmentResult:
     """
-    Execute actuarial evaluation on latest telemetry for policy/organization and persist results.
+    Execute deterministic risk evaluation on latest telemetry for policy/organization and persist results.
     """
     service = AssessmentService(db, settings=settings)
     return await service.evaluate_assessment(request)
@@ -87,6 +89,7 @@ async def execute_scenario(
     scenario_id: str,
     db: Session = Depends(get_db),
     settings: Annotated[Settings, Depends(get_settings)] = None,
+    current_user: UserProfile = Depends(get_current_user),
 ) -> RiskAssessmentResult:
     """
     Run one of the predefined deterministic scenarios directly.

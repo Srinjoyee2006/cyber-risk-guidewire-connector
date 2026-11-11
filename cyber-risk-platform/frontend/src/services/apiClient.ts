@@ -16,13 +16,33 @@ import type {
 } from '../types/api'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
+const TOKEN_STORAGE_KEY = 'crgc_access_token'
+const USER_STORAGE_KEY = 'crgc_auth_user'
+
+export interface AuthUserProfile {
+  username: string
+  role: string
+  full_name: string
+  is_active: boolean
+}
+
+export interface AuthTokenResponse {
+  access_token: string
+  token_type: string
+  user: AuthUserProfile
+}
+
+export function getAuthHeaders(): Record<string, string> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_STORAGE_KEY) : null
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
 
 class ApiError extends Error {
   status: number
   detail: string
 
   constructor(status: number, detail: string) {
-    super(`API Error ${status}: ${detail}`)
+    super(status === 401 ? `Authentication required: ${detail}` : `API Error ${status}: ${detail}`)
     this.name = 'ApiError'
     this.status = status
     this.detail = detail
@@ -32,11 +52,12 @@ class ApiError extends Error {
 async function fetchJson<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE}${endpoint}`
   const response = await fetch(url, {
+    ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
       ...options?.headers,
     },
-    ...options,
   })
 
   if (!response.ok) {
@@ -144,6 +165,9 @@ export const apiClient = {
     const url = `${API_BASE}/api/v1/assets/import`
     return fetch(url, {
       method: 'POST',
+      headers: {
+        ...getAuthHeaders(),
+      },
       body: formData,
     }).then(async (res) => {
       if (!res.ok) {
@@ -170,6 +194,9 @@ export const apiClient = {
     const url = `${API_BASE}/api/v1/vulnerability-observations/import`
     return fetch(url, {
       method: 'POST',
+      headers: {
+        ...getAuthHeaders(),
+      },
       body: formData,
     }).then(async (res) => {
       if (!res.ok) {
@@ -401,6 +428,45 @@ export const apiClient = {
       ? `/api/v1/underwriting/dashboard/${encodeURIComponent(orgRef)}`
       : `/api/v1/underwriting/dashboard`
     return fetchJson<import('../types/api').UnderwritingDashboardMetrics>(url)
+  },
+
+  // Authentication
+  login: async (username: string, password: string): Promise<AuthTokenResponse> => {
+    const res = await fetchJson<AuthTokenResponse>('/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    })
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(TOKEN_STORAGE_KEY, res.access_token)
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(res.user))
+    }
+    return res
+  },
+
+  logout: (): void => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(TOKEN_STORAGE_KEY)
+      localStorage.removeItem(USER_STORAGE_KEY)
+    }
+  },
+
+  getStoredToken: (): string | null => {
+    return typeof window !== 'undefined' ? localStorage.getItem(TOKEN_STORAGE_KEY) : null
+  },
+
+  getStoredUser: (): AuthUserProfile | null => {
+    if (typeof window === 'undefined') return null
+    const raw = localStorage.getItem(USER_STORAGE_KEY)
+    if (!raw) return null
+    try {
+      return JSON.parse(raw) as AuthUserProfile
+    } catch {
+      return null
+    }
+  },
+
+  getCurrentUser: (): Promise<AuthUserProfile> => {
+    return fetchJson<AuthUserProfile>('/api/v1/auth/me')
   },
 }
 

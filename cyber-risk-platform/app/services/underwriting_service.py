@@ -231,6 +231,8 @@ class UnderwritingService:
                 org_ref=org_ref,
                 trigger_category=trigger_category.value,
                 assessment_id=current_assessment.assessment_id if current_assessment else None,
+                current_risk_score=current_score,
+                coverage_evaluation_id=coverage_id,
             )
             if unresolved:
                 logger.info(
@@ -641,14 +643,19 @@ class UnderwritingService:
         limit: int = 50,
         offset: int = 0,
     ) -> Sequence[UnderwritingReviewResponse]:
-        """Lists all reviews with search and filter capabilities."""
+        """Lists reviews for authorized organizations with search and filter capabilities."""
         models = self.repo.list_all_reviews(
             status_filter=status_filter,
             search=search,
             limit=limit,
             offset=offset,
         )
-        return [self._model_to_response(m) for m in models]
+        authorized_reviews: list[UnderwritingReviewResponse] = []
+        for m in models:
+            org = self.org_repo.get_by_ref(m.organization_ref)
+            if org and org.is_authorized():
+                authorized_reviews.append(self._model_to_response(m))
+        return authorized_reviews
 
     def get_dashboard_metrics(self, org_ref: Optional[str] = None) -> UnderwritingDashboardMetricsResponse:
         """Returns KPI counts for underwriting reviews."""
@@ -685,8 +692,55 @@ class UnderwritingService:
         ]
 
     def get_simulated_activity_details(self, activity_id: str) -> SimulatedPolicyCenterActivityResponse:
-        """Retrieves details of a simulated PolicyCenter activity."""
+        """
+        Retrieves details of a simulated PolicyCenter activity.
+        Checks the in-memory mock store first, then falls back to persisted
+        underwriting_dispatch_attempts.response_payload_json so lookups survive restarts.
+        """
         activity = self.mock_adapter.get_simulated_activity(activity_id)
+        if not activity:
+            attempt = self.repo.get_dispatch_attempt_by_activity_id(activity_id)
+            if attempt and attempt.response_payload_json:
+                review = self.repo.get_review_by_id(attempt.review_id)
+                if review:
+                    self._enforce_org_authorization(review.organization_ref, require_exists=True)
+                res_json = attempt.response_payload_json
+                data = res_json.get("data", {}) if isinstance(res_json, dict) else {}
+                attrs = data.get("attributes", {}) if isinstance(data, dict) else {}
+                priority_obj = attrs.get("priority", {})
+                status_obj = attrs.get("status", {})
+                links_obj = data.get("links", {})
+                self_link = links_obj.get("self", {}) if isinstance(links_obj, dict) else {}
+
+                priority_val = priority_obj.get("code", "high") if isinstance(priority_obj, dict) else str(priority_obj or "high")
+                status_val = status_obj.get("name", "Open") if isinstance(status_obj, dict) else str(status_obj or "Open")
+                url_val = self_link.get("href") if isinstance(self_link, dict) else None
+
+                activity = SimulatedPolicyCenterActivityResponse(
+                    activity_id=attempt.simulated_policycenter_id or activity_id,
+                    activity_pattern=attrs.get("activityPattern", "underwriter_review"),
+                    subject=attrs.get("subject", "Simulated Underwriting Review"),
+                    priority=priority_val,
+                    status=status_val,
+                    target_date=attrs.get("targetDate", ""),
+                    policy_number=review.policy_number if review else "",
+                    insured_name=review.organization_name if review else "",
+                    simulated_policycenter_url=url_val or f"{self.mock_adapter.base_url}/activities/{activity_id}",
+                )
+                # Repopulate in-memory cache for subsequent fast reads
+                self.mock_adapter._simulated_activities[activity.activity_id] = {
+                    "activity_id": activity.activity_id,
+                    "activity_pattern": activity.activity_pattern,
+                    "subject": activity.subject,
+                    "priority": activity.priority,
+                    "status": activity.status,
+                    "target_date": activity.target_date,
+                    "policy_number": activity.policy_number,
+                    "insured_name": activity.insured_name,
+                    "simulated_policycenter_url": activity.simulated_policycenter_url,
+                    "review_id": attempt.review_id,
+                }
+
         if not activity:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

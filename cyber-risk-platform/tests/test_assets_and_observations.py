@@ -12,6 +12,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core.security import get_current_user, UserProfile
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import create_app
@@ -41,6 +42,9 @@ def client_and_db():
             db.close()
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = lambda: UserProfile(
+        username="test_underwriter", role="underwriter", full_name="Test User", is_active=True
+    )
     test_client = TestClient(app)
 
     yield test_client, TestingSessionLocal

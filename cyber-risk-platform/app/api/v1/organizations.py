@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.core.security import get_current_user, UserProfile
 from app.models.organization import Organization
 from app.repositories.organization_repository import OrganizationRepository
 from app.schemas.organization import (
@@ -40,6 +41,7 @@ router = APIRouter(prefix="/organizations", tags=["Organizations"])
 def create_organization(
     payload: OrganizationCreate,
     db: Session = Depends(get_db),
+    current_user: UserProfile = Depends(get_current_user),
 ) -> OrganizationResponse:
     repo = OrganizationRepository(db)
     existing = repo.get_by_ref(payload.organization_ref)
@@ -102,6 +104,7 @@ def update_organization(
     organization_ref: str,
     payload: OrganizationUpdate,
     db: Session = Depends(get_db),
+    current_user: UserProfile = Depends(get_current_user),
 ) -> OrganizationResponse:
     repo = OrganizationRepository(db)
     org = repo.get_by_ref(organization_ref)
@@ -200,6 +203,7 @@ def ingest_organization_telemetry(
     organization_ref: str,
     snapshot: TelemetrySnapshot,
     db: Session = Depends(get_db),
+    current_user: UserProfile = Depends(get_current_user),
 ) -> TelemetryIngestResponse:
     snapshot.organization_ref = organization_ref
     service = AssessmentService(db)
@@ -223,12 +227,13 @@ def get_organization_telemetry_history(
 @router.post(
     "/{organization_ref}/assessments/evaluate",
     response_model=RiskAssessmentResult,
-    summary="Evaluate and persist on-demand actuarial risk assessment for organization",
+    summary="Evaluate and persist on-demand deterministic cyber risk assessment for organization",
 )
 async def evaluate_organization_assessment(
     organization_ref: str,
     trigger_guidewire_workflow: bool = Query(default=True),
     db: Session = Depends(get_db),
+    current_user: UserProfile = Depends(get_current_user),
 ) -> RiskAssessmentResult:
     service = AssessmentService(db)
     req = AssessmentRequest(

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from config.settings import Settings, get_settings
 from app.db.session import get_db
+from app.core.security import get_current_user, UserProfile
 from app.services.underwriting_service import UnderwritingService
 from app.schemas.underwriting import (
     UnderwritingReviewCreateRequest,
@@ -23,7 +24,11 @@ from app.schemas.underwriting import (
 
 logger = logging.getLogger("crgc.api.underwriting")
 
-router = APIRouter(prefix="/underwriting", tags=["Underwriting Workflow & Guidewire Connector"])
+router = APIRouter(
+    prefix="/underwriting",
+    tags=["Underwriting Workflow & Guidewire Connector"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 def get_underwriting_service(

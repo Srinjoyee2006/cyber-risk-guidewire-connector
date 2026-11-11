@@ -9,6 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.security import get_current_user, UserProfile
 from app.db.session import get_db, SessionLocal
 from app.schemas.telemetry import (
     TelemetrySnapshot,
@@ -51,6 +52,7 @@ def store_telemetry(snapshot: TelemetrySnapshot) -> None:
 async def ingest_telemetry(
     snapshot: TelemetrySnapshot,
     db: Session = Depends(get_db),
+    current_user: UserProfile = Depends(get_current_user),
 ) -> TelemetryIngestResponse:
     """
     Ingest a new telemetry snapshot from edge sensors, EDR, ASM, or identity governance feeds.

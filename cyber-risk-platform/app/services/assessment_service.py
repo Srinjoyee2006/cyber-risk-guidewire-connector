@@ -350,49 +350,8 @@ class AssessmentService:
             "telemetry_freshness": "OUTDATED" if is_telemetry_outdated else "CURRENT",
         }
 
-        # 7. Guidewire Dispatch
-        guidewire_activity_created = False
-        guidewire_activity_id = None
-        guidewire_note_id = None
-
-        if request.trigger_guidewire_workflow and policy_action == PolicyAction.REVIEW_REQUIRED:
-            logger.warning(
-                "Policy %s exceeded review threshold (Score=%.1f). Dispatching Guidewire activity.",
-                telemetry_schema.policy_number,
-                aggregate_score,
-            )
-            try:
-                # Pre-construct lightweight schema for GW client
-                temp_res = RiskAssessmentResult(
-                    assessment_id=assessment_id,
-                    organization_ref=org_ref_final,
-                    policy_number=telemetry_schema.policy_number,
-                    company_name=company_name_final,
-                    base_score=self.risk_engine.settings.base_risk_score,
-                    aggregate_risk_score=aggregate_score,
-                    risk_tier=risk_tier,
-                    policy_action=policy_action,
-                    factor_breakdowns=factor_penalties,
-                    coverage_recommendations=coverage_recommendations,
-                    telemetry_summary=telemetry_summary,
-                )
-                note_resp = await self.gw_client.create_policy_note(
-                    policy_number=telemetry_schema.policy_number,
-                    assessment=temp_res,
-                )
-                guidewire_note_id = note_resp.data.id
-
-                activity_resp = await self.gw_client.create_underwriter_activity(
-                    policy_number=telemetry_schema.policy_number,
-                    assessment=temp_res,
-                )
-                guidewire_activity_created = True
-                guidewire_activity_id = activity_resp.data.id
-            except Exception as e:
-                logger.error("Failed to execute Guidewire Cloud integration: %s", str(e), exc_info=True)
-                coverage_recommendations.underwriter_notes += f" [Guidewire Dispatch Warning: {str(e)}]"
-
-        # 8. Persist Assessment, Factors, and Evidence Snapshots to Database
+        # 7. Persist Assessment, Factors, and Evidence Snapshots to Database FIRST
+        # (So UnderwritingService can capture the exact immutable snapshot of this assessment)
         now_dt = datetime.now(timezone.utc)
         assessment_model = RiskAssessmentModel(
             assessment_id=assessment_id,
@@ -409,9 +368,9 @@ class AssessmentService:
             calculation_formula="clamp(5 + MFA + RDP + CVE + EDR, 0, 100) v1.0",
             status=evidence_status,
             previous_assessment_id=prev_id,
-            guidewire_activity_created=guidewire_activity_created,
-            guidewire_activity_id=guidewire_activity_id,
-            guidewire_note_id=guidewire_note_id,
+            guidewire_activity_created=False,
+            guidewire_activity_id=None,
+            guidewire_note_id=None,
             telemetry_id=telemetry_model.telemetry_id,
             telemetry_summary=telemetry_summary,
             coverage_recommendations=coverage_recommendations.model_dump(),
@@ -466,8 +425,76 @@ class AssessmentService:
             )
         assessment_model.evidence_items = evidence_models
 
-        # Commit to DB
+        # Commit assessment to DB
         saved_assessment = self.assessment_repo.create(assessment_model)
+
+        # 8. Unified Underwriting Review Routing & Optional Simulated Guidewire Dispatch
+        if policy_action == PolicyAction.REVIEW_REQUIRED:
+            org_record = self.org_repo.get_by_ref(org_ref_final)
+            if org_record and org_record.is_authorized():
+                logger.info(
+                    "Assessment %s for %s scored %.1f (REVIEW_REQUIRED). Routing through persistent UnderwritingService.",
+                    saved_assessment.assessment_id,
+                    org_ref_final,
+                    aggregate_score,
+                )
+                try:
+                    from app.services.underwriting_service import UnderwritingService
+                    from app.schemas.underwriting import UnderwritingReviewCreateRequest
+
+                    uw_service = UnderwritingService(self.db, settings=self.settings)
+                    uw_req = UnderwritingReviewCreateRequest(
+                        organization_ref=org_ref_final,
+                        policy_id=None,
+                        trigger_reason=f"Risk assessment {saved_assessment.assessment_id} scored {aggregate_score:.1f}/100 ({risk_tier.value}) > 60.0 threshold",
+                        force_new=False,
+                    )
+                    uw_review = uw_service.create_or_trigger_review(uw_req)
+
+                    if request.trigger_guidewire_workflow:
+                        if uw_review.status.value in ("PENDING", "FAILED"):
+                            uw_review = uw_service.dispatch_review(uw_review.review_id)
+                        if uw_review.guidewire_activity_id:
+                            saved_assessment.guidewire_activity_created = True
+                            saved_assessment.guidewire_activity_id = uw_review.guidewire_activity_id
+                            self.db.commit()
+                            self.db.refresh(saved_assessment)
+                except Exception as uw_err:
+                    logger.error("Failed to route qualifying assessment to UnderwritingService: %s", str(uw_err), exc_info=True)
+                    cov_rec = dict(saved_assessment.coverage_recommendations or {})
+                    cov_rec["underwriter_notes"] = f"{cov_rec.get('underwriter_notes', '')} [Underwriting Workflow Warning: {str(uw_err)}]"
+                    saved_assessment.coverage_recommendations = cov_rec
+                    self.db.commit()
+                    self.db.refresh(saved_assessment)
+            elif request.trigger_guidewire_workflow:
+                # Legacy standalone policy fallback when no Organization entity is registered (e.g., Scenario B POL-001)
+                logger.warning(
+                    "Policy %s exceeded review threshold (Score=%.1f). Dispatching simulated Guidewire activity.",
+                    telemetry_schema.policy_number,
+                    aggregate_score,
+                )
+                try:
+                    temp_res = self._assessment_model_to_schema(saved_assessment)
+                    note_resp = await self.gw_client.create_policy_note(
+                        policy_number=telemetry_schema.policy_number,
+                        assessment=temp_res,
+                    )
+                    activity_resp = await self.gw_client.create_underwriter_activity(
+                        policy_number=telemetry_schema.policy_number,
+                        assessment=temp_res,
+                    )
+                    saved_assessment.guidewire_note_id = note_resp.data.id
+                    saved_assessment.guidewire_activity_created = True
+                    saved_assessment.guidewire_activity_id = activity_resp.data.id
+                    self.db.commit()
+                    self.db.refresh(saved_assessment)
+                except Exception as e:
+                    logger.error("Failed to execute Guidewire Cloud integration: %s", str(e), exc_info=True)
+                    cov_rec = dict(saved_assessment.coverage_recommendations or {})
+                    cov_rec["underwriter_notes"] = f"{cov_rec.get('underwriter_notes', '')} [Guidewire Dispatch Warning: {str(e)}]"
+                    saved_assessment.coverage_recommendations = cov_rec
+                    self.db.commit()
+                    self.db.refresh(saved_assessment)
         logger.info(
             "Persisted assessment %s for %s. Score=%.1f, Tier=%s, Action=%s, Factors=%d, Evidence=%d",
             saved_assessment.assessment_id,

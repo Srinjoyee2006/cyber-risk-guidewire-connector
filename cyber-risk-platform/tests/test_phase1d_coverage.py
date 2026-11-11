@@ -17,6 +17,12 @@ from app.models.policy import (
     PolicyCoverageSectionModel,
     CoverageEvaluationModel,
 )
+from app.models.assessment import (
+    TelemetrySnapshotModel,
+    RiskAssessmentModel,
+    AssessmentFactorBreakdownModel,
+    AssessmentEvidenceSnapshotModel,
+)
 from app.schemas.coverage import (
     CoverageCategoryEnum,
     CoverageStatusEnum,
@@ -54,7 +60,31 @@ def authorized_org(db_session: Session):
 
     yield org
 
-    # Cleanup policies and evaluations
+    # Cleanup policies, evaluations, assessments, factors, evidence, and telemetry
+    db_session.query(AssessmentEvidenceSnapshotModel).filter(
+        AssessmentEvidenceSnapshotModel.assessment_id.in_(
+            db_session.query(RiskAssessmentModel.assessment_id).filter(
+                RiskAssessmentModel.organization_ref == org_ref
+            )
+        )
+    ).delete(synchronize_session=False)
+
+    db_session.query(AssessmentFactorBreakdownModel).filter(
+        AssessmentFactorBreakdownModel.assessment_id.in_(
+            db_session.query(RiskAssessmentModel.assessment_id).filter(
+                RiskAssessmentModel.organization_ref == org_ref
+            )
+        )
+    ).delete(synchronize_session=False)
+
+    db_session.query(RiskAssessmentModel).filter(
+        RiskAssessmentModel.organization_ref == org_ref
+    ).delete(synchronize_session=False)
+
+    db_session.query(TelemetrySnapshotModel).filter(
+        TelemetrySnapshotModel.organization_ref == org_ref
+    ).delete(synchronize_session=False)
+
     db_session.query(CoverageEvaluationModel).filter(
         CoverageEvaluationModel.organization_ref == org_ref
     ).delete(synchronize_session=False)

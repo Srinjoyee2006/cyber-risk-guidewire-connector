@@ -24,7 +24,7 @@ export const OrganizationRiskCalculationSection: React.FC<{ defaultOpen?: boolea
       maxPenalty: '5.0 pts',
       icon: Building2,
       color: 'text-blue-400',
-      description: 'Actuarial residual risk floor representing intrinsic enterprise exposure and unmodelled hazards.',
+      description: 'Baseline residual risk floor representing intrinsic enterprise exposure and unmodelled hazards.',
     },
     {
       name: 'MFA Enforcement Deficit',
@@ -125,7 +125,7 @@ export const OrganizationRiskCalculationSection: React.FC<{ defaultOpen?: boolea
               How is Organization Risk Calculated?
             </h3>
             <p className="text-xs text-slate-400">
-              Actuarial RiskEngine transparent formula, telemetry penalties, and PolicyCenter decision thresholds.
+              Deterministic Cyber Risk Engine transparent formula, telemetry penalties, and simulated PolicyCenter referral thresholds.
             </p>
           </div>
         </div>
@@ -151,13 +151,13 @@ export const OrganizationRiskCalculationSection: React.FC<{ defaultOpen?: boolea
           {/* Mathematical Formula Banner */}
           <div className="p-4 rounded-lg bg-slate-950/80 border border-slate-800 space-y-2">
             <div className="text-xs font-semibold uppercase tracking-wider text-blue-400">
-              Actuarial RiskEngine Formulation
+              Risk Calculation Method (Deterministic Ruleset)
             </div>
             <div className="font-mono text-sm text-slate-200 bg-slate-900/90 p-3 rounded border border-slate-800 overflow-x-auto">
               <span className="text-blue-300 font-bold">Aggregate Risk Score</span> = min(100.0, max(0.0, 5.0 (Base) + MFA_Penalty + RDP_Penalty + Critical_CVE_Penalty + EDR_Penalty))
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Every insured begins with a baseline residual score of 5.0. Observed security telemetry deficits accrue transparent additive penalties capped at actuarial maximums. The sum is clamped to [0.0, 100.0] and drives automated PolicyCenter underwriting workflows.
+              Every insured begins with a baseline residual score of 5.0. Observed security telemetry deficits accrue transparent additive penalties capped at engineering benchmark ceilings. The sum is clamped to [0.0, 100.0] and routes advisory review workflows requiring human underwriter adjudication.
             </p>
           </div>
 
@@ -166,7 +166,7 @@ export const OrganizationRiskCalculationSection: React.FC<{ defaultOpen?: boolea
             {/* Risk Tiers */}
             <div className="p-4 rounded-lg bg-slate-950/60 border border-slate-800 space-y-2">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 block">
-                Actuarial Risk Tiers (Score Scale 0.0 – 100.0)
+                Deterministic Risk Tiers (Score Scale 0.0 – 100.0)
               </span>
               <div className="space-y-1.5 font-mono text-[11px]">
                 <div className="flex justify-between p-1.5 rounded bg-emerald-950/20 text-emerald-300 border border-emerald-900/40">
@@ -191,12 +191,12 @@ export const OrganizationRiskCalculationSection: React.FC<{ defaultOpen?: boolea
             {/* Policy Actions */}
             <div className="p-4 rounded-lg bg-slate-950/60 border border-slate-800 space-y-2">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 block">
-                PolicyCenter Automated Underwriting Actions
+                PolicyCenter Advisory Referral Triggers
               </span>
               <div className="space-y-1.5 text-[11px]">
                 <div className="p-1.5 rounded bg-slate-900 border border-slate-800 flex justify-between items-center">
                   <span className="font-bold font-mono text-emerald-400">NOMINAL (&lt; 40.0)</span>
-                  <span className="text-slate-300">Standard in-force terms, zero sublimit restriction</span>
+                  <span className="text-slate-300">Standard in-force terms, no review referral</span>
                 </div>
                 <div className="p-1.5 rounded bg-slate-900 border border-slate-800 flex justify-between items-center">
                   <span className="font-bold font-mono text-amber-400">MONITOR (40.0 – 60.0)</span>
@@ -204,7 +204,7 @@ export const OrganizationRiskCalculationSection: React.FC<{ defaultOpen?: boolea
                 </div>
                 <div className="p-1.5 rounded bg-slate-900 border border-slate-800 flex justify-between items-center">
                   <span className="font-bold font-mono text-rose-400">REVIEW_REQUIRED (&gt; 60.0)</span>
-                  <span className="text-slate-300">Dispatches Underwriter Activity + Note to PolicyCenter</span>
+                  <span className="text-slate-300">Triggers Underwriting Review queue for human decision</span>
                 </div>
               </div>
             </div>
@@ -221,9 +221,9 @@ export const OrganizationRiskCalculationSection: React.FC<{ defaultOpen?: boolea
                   <tr>
                     <th className="px-3 py-2.5 font-semibold">Factor Name</th>
                     <th className="px-3 py-2.5 font-semibold">Underwriting Benchmark</th>
-                    <th className="px-3 py-2.5 font-semibold">Penalty Formulation</th>
+                    <th className="px-3 py-2.5 font-semibold">Penalty Formula</th>
                     <th className="px-3 py-2.5 font-semibold">Max Ceiling</th>
-                    <th className="px-3 py-2.5 font-semibold">Actuarial Rationale</th>
+                    <th className="px-3 py-2.5 font-semibold">Engineering &amp; Risk Rationale</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">

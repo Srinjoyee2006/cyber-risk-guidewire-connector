@@ -44,22 +44,35 @@ class UnderwritingRepository:
         org_ref: str,
         trigger_category: str,
         assessment_id: Optional[str] = None,
+        current_risk_score: Optional[float] = None,
+        coverage_evaluation_id: Optional[str] = None,
     ) -> Optional[UnderwritingReviewModel]:
         """
         Retrieves any existing, non-closed review for the same organization and triggering event.
-        Prevents duplicate unresolved reviews from being created repeatedly for the same trigger.
+        Prevents duplicate unresolved reviews from being created repeatedly for the same trigger
+        or identical unchanged risk/coverage state, while allowing separate reviews when genuinely
+        new risk scores or coverage evaluations occur.
         """
         unresolved_statuses = ["PENDING", "DISPATCHED", "ACKNOWLEDGED", "IN_REVIEW", "INFORMATION_REQUESTED"]
         stmt = select(UnderwritingReviewModel).where(
             UnderwritingReviewModel.organization_ref == org_ref,
             UnderwritingReviewModel.trigger_category == trigger_category,
             UnderwritingReviewModel.status.in_(unresolved_statuses),
-        )
-        if assessment_id:
-            stmt = stmt.where(UnderwritingReviewModel.assessment_id == assessment_id)
+        ).order_by(UnderwritingReviewModel.created_at.desc())
 
-        stmt = stmt.order_by(UnderwritingReviewModel.created_at.desc())
-        return self.db.scalars(stmt).first()
+        candidates = list(self.db.scalars(stmt).all())
+        for candidate in candidates:
+            if assessment_id and candidate.assessment_id == assessment_id and candidate.coverage_evaluation_id == coverage_evaluation_id:
+                return candidate
+            if (
+                current_risk_score is not None
+                and candidate.current_risk_score == current_risk_score
+                and candidate.coverage_evaluation_id == coverage_evaluation_id
+            ):
+                return candidate
+            if not assessment_id and current_risk_score is None:
+                return candidate
+        return None
 
     def list_reviews_for_org(
         self,
@@ -135,6 +148,17 @@ class UnderwritingRepository:
             .order_by(UnderwritingDispatchAttemptModel.dispatch_timestamp.desc())
         )
         return self.db.scalars(stmt).all()
+
+    def get_dispatch_attempt_by_activity_id(
+        self, activity_id: str
+    ) -> Optional[UnderwritingDispatchAttemptModel]:
+        """Retrieves the most recent dispatch attempt matching a simulated PolicyCenter activity ID."""
+        stmt = (
+            select(UnderwritingDispatchAttemptModel)
+            .where(UnderwritingDispatchAttemptModel.simulated_policycenter_id == activity_id)
+            .order_by(UnderwritingDispatchAttemptModel.dispatch_timestamp.desc())
+        )
+        return self.db.scalars(stmt).first()
 
     def add_status_history(
         self, history: UnderwritingStatusHistoryModel

@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from config.settings import Settings, get_settings
+from app.core.security import get_current_user, UserProfile
 from app.db.session import get_db
 from app.services.coverage_service import CoverageService
 from app.schemas.coverage import (
@@ -42,6 +43,7 @@ def get_coverage_service(
 def create_policy(
     req: InsurancePolicyCreateRequest,
     service: Annotated[CoverageService, Depends(get_coverage_service)],
+    current_user: UserProfile = Depends(get_current_user),
 ) -> InsurancePolicyResponse:
     return service.create_policy(req)
 
@@ -97,6 +99,7 @@ def update_policy(
     policy_id: uuid.UUID,
     req: InsurancePolicyUpdateRequest,
     service: Annotated[CoverageService, Depends(get_coverage_service)],
+    current_user: UserProfile = Depends(get_current_user),
 ) -> InsurancePolicyResponse:
     return service.update_policy(policy_id, req)
 
@@ -110,6 +113,7 @@ def update_policy(
 def delete_policy(
     policy_id: uuid.UUID,
     service: Annotated[CoverageService, Depends(get_coverage_service)],
+    current_user: UserProfile = Depends(get_current_user),
 ) -> None:
     service.delete_policy(policy_id)
 
@@ -125,6 +129,7 @@ def add_coverage_section(
     policy_id: uuid.UUID,
     section: CoverageSectionCreateRequest,
     service: Annotated[CoverageService, Depends(get_coverage_service)],
+    current_user: UserProfile = Depends(get_current_user),
 ) -> CoverageSectionSchema:
     return service.add_coverage_section(policy_id, section)
 
@@ -139,5 +144,6 @@ def delete_coverage_section(
     policy_id: uuid.UUID,
     section_id: uuid.UUID,
     service: Annotated[CoverageService, Depends(get_coverage_service)],
+    current_user: UserProfile = Depends(get_current_user),
 ) -> None:
     service.delete_coverage_section(policy_id, section_id)

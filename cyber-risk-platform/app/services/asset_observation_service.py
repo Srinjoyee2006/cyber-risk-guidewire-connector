@@ -421,6 +421,14 @@ class AssetObservationService:
             )
 
         org = self.org_repo.get_by_id(asset.organization_id)
+        if org and not org.is_authorized():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    f"Organization '{org.organization_ref}' data authorization status is '{org.data_authorization_status}'. "
+                    "Access is forbidden unless authorization status is 'GRANTED'."
+                ),
+            )
         org_ref = org.organization_ref if org else "UNKNOWN"
 
         # 1. Fetch Scanner-reported observations

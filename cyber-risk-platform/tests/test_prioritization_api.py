@@ -11,6 +11,7 @@ from httpx import AsyncClient, ASGITransport
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from app.core.security import get_current_user, UserProfile
 from app.main import create_app
 from app.db.base import Base
 from app.db.session import get_db
@@ -68,6 +69,9 @@ def app_with_test_db(nvd_fixture_data: dict, kev_fixture_data: dict, tmp_path):
     app = create_app()
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_ingestion_service] = override_get_ingestion_service
+    app.dependency_overrides[get_current_user] = lambda: UserProfile(
+        username="test_underwriter", role="underwriter", full_name="Test User", is_active=True
+    )
 
     yield app, test_engine, TestingSessionLocal
 

@@ -51,6 +51,44 @@ class Settings(BaseSettings):
     )
 
     # --------------------------------------------------------------------------
+    # Security, Authentication & CORS Settings
+    # --------------------------------------------------------------------------
+    jwt_secret_key: str = Field(
+        default="",
+        description="HMAC-SHA256 signing secret for JWT tokens. Must be set explicitly in production.",
+    )
+    jwt_algorithm: str = Field(
+        default="HS256",
+        description="JWT signing algorithm",
+    )
+    jwt_expiration_minutes: int = Field(
+        default=120,
+        ge=5,
+        description="Access token expiration window in minutes",
+    )
+    demo_auth_enabled: bool = Field(
+        default=True,
+        description="Enable development-only demo user accounts when app_env is development or test",
+    )
+    demo_underwriter_password: str = Field(
+        default="",
+        description="Development-only password for demo underwriter account (set via .env or environment)",
+    )
+    demo_admin_password: str = Field(
+        default="",
+        description="Development-only password for demo admin account (set via .env or environment)",
+    )
+    cors_allowed_origins: str = Field(
+        default="http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000",
+        description="Comma-separated list of permitted CORS origins",
+    )
+    max_csv_upload_bytes: int = Field(
+        default=5 * 1024 * 1024,
+        ge=1024,
+        description="Maximum allowed CSV file upload size in bytes (default 5 MB)",
+    )
+
+    # --------------------------------------------------------------------------
     # Guidewire PolicyCenter 10.2.1 Integration Settings
     # --------------------------------------------------------------------------
     gw_mock_mode: bool = Field(

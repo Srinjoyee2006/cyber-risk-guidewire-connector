@@ -12,16 +12,11 @@ from sqlalchemy.orm import sessionmaker, Session
 from config.settings import get_settings
 
 
-@event.listens_for(Engine, "connect")
-def _set_sqlite_pragma(dbapi_connection: Any, connection_record: Any) -> None:
-    """Enforces SQLite foreign key constraints for every connection."""
-    if dbapi_connection.__class__.__module__.startswith("sqlite3"):
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.close()
-
-
-def create_db_engine(db_url: str | None = None, echo: bool | None = None):
+def create_db_engine(db_url: str | None = None, echo: bool | None = None) -> Engine:
+    """
+    Creates and configures a SQLAlchemy engine.
+    Enforces SQLite foreign key constraints (PRAGMA foreign_keys=ON) on all SQLite connections.
+    """
     settings = get_settings()
     url = db_url or settings.database_url
     should_echo = echo if echo is not None else settings.db_echo
@@ -30,11 +25,21 @@ def create_db_engine(db_url: str | None = None, echo: bool | None = None):
     if url.startswith("sqlite"):
         connect_args["check_same_thread"] = False
 
-    return create_engine(
+    eng = create_engine(
         url,
         echo=should_echo,
         connect_args=connect_args,
     )
+
+    if url.startswith("sqlite"):
+        @event.listens_for(eng, "connect")
+        def _set_sqlite_pragma(dbapi_connection: Any, connection_record: Any) -> None:
+            """Enforces SQLite foreign key constraints on every connection created by this engine."""
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+
+    return eng
 
 
 engine = create_db_engine()
